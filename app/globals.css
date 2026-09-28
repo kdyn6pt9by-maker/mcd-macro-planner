@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background: #0d0505;
+  color: #f5e9ea;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-card-in {
+  animation: fadeSlideIn 0.35s ease-out both;
+}
+
+@keyframes popCheck {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-pop {
+  animation: popCheck 0.4s ease-out both;
+}
+
+.btn-tap {
+  transition: transform 0.08s ease-out;
+}
+
+.btn-tap:active {
+  transform: scale(0.96);
+}
