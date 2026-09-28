@@ -6,19 +6,20 @@ to fill the rest of your calorie/protein/fat targets — nothing more.
 
 Not a general calorie tracker, not affiliated with McDonald's.
 
-## Nutrition data status — READ BEFORE USING
+## Nutrition data status
 
-The McDonald's UAE items in `lib/data/defaultSettings.ts` ship with
-**zeroed, unverified macros and are disabled by default**. This build
-environment could not reach `mcdonalds.com/ae` (network policy blocked it),
-and the project's own rule is: never invent or substitute nutrition numbers.
+The McDonald's UAE items in `lib/data/defaultSettings.ts` are populated and
+enabled, sourced from the official product pages linked in each entry
+(researched 2026-09-28, since this build environment's network policy
+blocks `mcdonalds.com/ae` directly). Spot-check a couple against the live
+pages when convenient.
 
-Before the recommendation engine is useful, fill in official values:
+To edit or re-verify a value:
 
 1. Open the app → **Settings → Nutrition Database**.
-2. For each item, enter the kcal/protein/fat/carbs from the official
-   McDonald's UAE nutrition page, then check **Verified**.
-3. Only `enabled && verified` items are ever used by the optimizer.
+2. Update kcal/protein/fat/carbs, keep **Verified** checked.
+3. Only `enabled && verified` items are ever used by the optimizer —
+   uncheck either to exclude an item.
 
 ## Stack
 

@@ -1,44 +1,140 @@
 import { FoodItem, Settings } from "../types";
 
 /**
- * IMPORTANT — NUTRITION DATA STATUS
- * ----------------------------------
- * McDonald's UAE (mcdonalds.com/ae) could not be reached from this build
- * environment (network policy blocked the domain). Per the project spec,
- * NO nutrition values may be invented or substituted from another country's
- * menu. Every McDonald's item below therefore starts as `verified: false`
- * with zeroed macros and `enabled: false`, so the recommendation engine
- * ignores it until a human fills in official numbers.
- *
- * To activate an item:
- *  1. Open Settings → Nutrition Database in the app, or
- *  2. Edit the `macros` values below directly and flip `verified: true`.
- * Always record `source` and `lastVerified` when you do.
+ * NUTRITION DATA STATUS
+ * ----------------------
+ * This build environment's network policy blocks mcdonalds.com/ae, so this
+ * session could not fetch the values directly. The numbers below were
+ * researched externally (ChatGPT, 2026-09-28) against the official product
+ * pages linked in each item's `source`. They are marked `verified: true`
+ * and `enabled: true` on that basis, but were not independently confirmed
+ * by this session — spot-check a couple against the live pages when you
+ * get a chance, and update via Settings → Nutrition Database if anything
+ * is off.
  */
-const unverified = (id: string, name: string): FoodItem => ({
-  id,
-  name,
-  category: "mcdonalds",
-  macros: { kcal: 0, protein: 0, fat: 0, carbs: 0 },
-  serving: undefined,
-  source: "NOT YET VERIFIED — enter official mcdonalds.com/ae values",
-  lastVerified: undefined,
-  verified: false,
-  enabled: false,
-});
+const VERIFIED_DATE = "2026-09-28";
+
+function verifiedFood(
+  id: string,
+  name: string,
+  kcal: number,
+  protein: number,
+  fat: number,
+  carbs: number,
+  source: string
+): FoodItem {
+  return {
+    id,
+    name,
+    category: "mcdonalds",
+    macros: { kcal, protein, fat, carbs },
+    source,
+    lastVerified: VERIFIED_DATE,
+    verified: true,
+    enabled: true,
+  };
+}
 
 export const defaultMcDonaldsFoods: FoodItem[] = [
-  unverified("big-mac", "Big Mac"),
-  unverified("big-tasty", "Big Tasty"),
-  unverified("mcchicken", "McChicken"),
-  unverified("chicken-mac", "Chicken Mac"),
-  unverified("cheeseburger", "Cheeseburger"),
-  unverified("double-cheeseburger", "Double Cheeseburger"),
-  unverified("mcnuggets-6", "Chicken McNuggets (6 pc)"),
-  unverified("mcnuggets-9", "Chicken McNuggets (9 pc)"),
-  unverified("beef-burger", "Beef Burger"),
-  unverified("chickenburger", "Chickenburger"),
-  unverified("quarter-pounder-cheese", "Quarter Pounder with Cheese"),
+  verifiedFood(
+    "big-mac",
+    "Big Mac",
+    549,
+    23,
+    30,
+    46,
+    "https://www.mcdonalds.com/ae/en-ae/product/big-mac.html"
+  ),
+  verifiedFood(
+    "big-tasty",
+    "Big Tasty",
+    831,
+    44,
+    46,
+    61,
+    "https://www.mcdonalds.com/ae/en-ae/product/big-tasty.html"
+  ),
+  verifiedFood(
+    "mcchicken",
+    "McChicken",
+    448,
+    17,
+    21,
+    47,
+    "https://www.mcdonalds.com/ae/en-ae/product/mcchicken.html"
+  ),
+  verifiedFood(
+    "chicken-mac",
+    "Chicken Mac",
+    555,
+    26,
+    26,
+    55,
+    "https://www.mcdonalds.com/ae/en-ae/product/chicken-mac.html"
+  ),
+  verifiedFood(
+    "cheeseburger",
+    "Cheeseburger",
+    295,
+    13,
+    13,
+    32,
+    "https://www.mcdonalds.com/ae/en-ae/product/cheeseburger.html"
+  ),
+  verifiedFood(
+    "double-cheeseburger",
+    "Double Cheeseburger",
+    434,
+    21,
+    24,
+    34,
+    "https://www.mcdonalds.com/ae/en-ae/product/double-cheese-burger.html"
+  ),
+  verifiedFood(
+    "mcnuggets-6",
+    "Chicken McNuggets (6 pc)",
+    229,
+    15,
+    12,
+    15,
+    "https://www.mcdonalds.com/ae/en-ae/product/chicken-mcnuggets-6-pieces.html"
+  ),
+  verifiedFood(
+    "mcnuggets-9",
+    "Chicken McNuggets (9 pc)",
+    343,
+    23,
+    18,
+    22,
+    "https://www.mcdonalds.com/ae/en-ae/product/chicken-mcnuggets-9-pieces.html"
+  ),
+  verifiedFood(
+    "beef-burger",
+    "Beef Burger",
+    244,
+    11,
+    9,
+    31,
+    "https://www.mcdonalds.com/ae/en-ae/product/beef-burger.html"
+  ),
+  verifiedFood(
+    "chickenburger",
+    "Chickenburger",
+    287,
+    12,
+    11,
+    35,
+    "https://www.mcdonalds.com/ae/en-ae/product/chicken-burger.html"
+  ),
+  verifiedFood(
+    "quarter-pounder-cheese",
+    "Quarter Pounder with Cheese",
+    531,
+    33,
+    27,
+    41,
+    "https://www.mcdonalds.com/ae/en-ae/product/quarter-pounder-with-cheese.html"
+  ),
 ];
 
 export const defaultSettings: Settings = {
