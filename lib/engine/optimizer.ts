@@ -2,7 +2,10 @@ import { Combination, FoodItem, Macros, Targets } from "../types";
 import { ZERO_MACROS, addMacros, roundMacros, scaleMacros } from "./macros";
 
 const MAX_ITEMS_PER_COMBO = 5;
-const MAX_RESULTS = 5;
+const MAX_RESULTS = 10;
+const MAX_PER_MAIN_ITEM = 2;
+/** ~600 kcal of calorie-gap penalty; keeps variety from dragging in poor fits. */
+const DIVERSITY_SCORE_WINDOW = 3000;
 
 interface SearchOptions {
   eaten: Macros;
@@ -11,6 +14,7 @@ interface SearchOptions {
   /** A synthetic FoodItem representing one Nada bottle, or null if no allowance left. */
   nadaItem: FoodItem | null;
   nadaBottlesRemaining: number;
+  maxResults?: number;
 }
 
 interface CandidateLine {
@@ -138,9 +142,55 @@ export function findRecommendations(opts: SearchOptions): Combination[] {
   }
 
   candidates.sort((a, b) => a.score - b.score);
+  return labelCombinations(pickDiverse(candidates, opts.maxResults ?? MAX_RESULTS));
+}
 
-  const top = candidates.slice(0, Math.min(MAX_RESULTS * 4, candidates.length));
-  return labelCombinations(top).slice(0, MAX_RESULTS);
+/** Which McDonald's items (ignoring quantity and Nada) make up the order. */
+export function sandwichSignature(c: Combination): string {
+  return c.items
+    .filter((i) => i.food.category !== "nada")
+    .map((i) => i.food.id)
+    .sort()
+    .join("|");
+}
+
+function mainItem(c: Combination): string {
+  const mcd = c.items.filter((i) => i.food.category !== "nada");
+  if (mcd.length === 0) return "nada-only";
+  return mcd.reduce((a, b) => (b.food.macros.kcal * b.qty > a.food.macros.kcal * a.qty ? b : a)).food.id;
+}
+
+/**
+ * The raw ranking tends to return near-identical orders (same sandwiches,
+ * one Nada more or less). Greedily keep the best order for each distinct
+ * sandwich mix, and cap how often one sandwich can headline, so the list
+ * shows genuinely different choices. Falls back to plain ranking to fill.
+ */
+function pickDiverse(sorted: Combination[], limit: number): Combination[] {
+  if (sorted.length === 0) return [];
+  const ceiling = sorted[0].score + DIVERSITY_SCORE_WINDOW;
+  const pool = sorted.filter((c) => c.score <= ceiling);
+  const chosen: Combination[] = [];
+  const signatures = new Set<string>();
+  const mainCounts = new Map<string, number>();
+
+  for (const c of pool) {
+    if (chosen.length >= limit) break;
+    const sig = sandwichSignature(c);
+    const main = mainItem(c);
+    if (signatures.has(sig) || (mainCounts.get(main) ?? 0) >= MAX_PER_MAIN_ITEM) continue;
+    chosen.push(c);
+    signatures.add(sig);
+    mainCounts.set(main, (mainCounts.get(main) ?? 0) + 1);
+  }
+  for (const c of pool) {
+    if (chosen.length >= limit) break;
+    if (!chosen.includes(c) && !signatures.has(sandwichSignature(c))) {
+      chosen.push(c);
+      signatures.add(sandwichSignature(c));
+    }
+  }
+  return chosen;
 }
 
 function labelCombinations(sorted: Combination[]): Combination[] {

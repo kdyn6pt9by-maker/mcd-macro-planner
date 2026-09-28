@@ -24,6 +24,15 @@ export function subtractMacros(a: Macros, b: Macros): Macros {
   };
 }
 
+/** Atwater factors: 4 kcal/g protein & carbs, 9 kcal/g fat. */
+export function kcalFromMacros(protein: number, carbs: number, fat: number): number {
+  return protein * 4 + carbs * 4 + fat * 9;
+}
+
+export function sumMacros(list: Macros[]): Macros {
+  return list.reduce(addMacros, ZERO_MACROS);
+}
+
 /** Sensible display rounding: whole kcal, one decimal for macros. */
 export function roundMacros(m: Macros): Macros {
   return {

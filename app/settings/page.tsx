@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { clearHistory, loadSettings, saveSettings } from "@/lib/storage";
-import { DayMode, Settings } from "@/lib/types";
+import { kcalFromMacros } from "@/lib/engine/macros";
+import { DayMode, FoodItem, Settings } from "@/lib/types";
 
 function NumberField({
   label,
@@ -24,6 +25,71 @@ function NumberField({
         className="w-24 bg-black/30 rounded-lg px-2 py-1 text-right text-sm border border-cardBorder"
       />
     </label>
+  );
+}
+
+function AddItemForm({ onAdd }: { onAdd: (food: FoodItem) => void }) {
+  const [name, setName] = useState("");
+  const [p, setP] = useState("");
+  const [c, setC] = useState("");
+  const [f, setF] = useState("");
+  const [k, setK] = useState("");
+  const n = (v: string) => Math.max(0, parseFloat(v) || 0);
+  const kcal = n(k) || Math.round(kcalFromMacros(n(p), n(c), n(f)));
+  const valid = name.trim().length > 0 && kcal > 0;
+
+  return (
+    <div className="mt-4 rounded-2xl bg-black/25 p-3">
+      <div className="text-sm font-bold mb-2">+ Add McDonald&apos;s item</div>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="e.g. Grand Chicken Spicy"
+        className="w-full bg-black/30 rounded-lg px-3 py-2 text-sm border border-cardBorder mb-2"
+      />
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { v: p, s: setP, ph: "protein" },
+          { v: c, s: setC, ph: "carbs" },
+          { v: f, s: setF, ph: "fat" },
+          { v: k, s: setK, ph: `${kcal || "kcal"}` },
+        ].map((x) => (
+          <input
+            key={x.ph + "-in"}
+            type="number"
+            inputMode="decimal"
+            value={x.v}
+            placeholder={x.ph}
+            onChange={(e) => x.s(e.target.value)}
+            className="no-spin bg-black/30 rounded-lg px-2 py-1.5 text-xs border border-cardBorder"
+          />
+        ))}
+      </div>
+      <div className="text-[11px] text-muted mt-1.5">Calories: {kcal} kcal {n(k) ? "(manual)" : "(auto 4·4·9)"}</div>
+      <button
+        disabled={!valid}
+        onClick={() => {
+          onAdd({
+            id: `custom-${Date.now().toString(36)}`,
+            name: name.trim(),
+            category: "mcdonalds",
+            macros: { kcal, protein: n(p), carbs: n(c), fat: n(f) },
+            source: "Added manually",
+            lastVerified: new Date().toISOString().slice(0, 10),
+            verified: true,
+            enabled: true,
+          });
+          setName("");
+          setP("");
+          setC("");
+          setF("");
+          setK("");
+        }}
+        className="mt-2 w-full rounded-xl bg-gold text-black font-bold py-2 text-sm disabled:opacity-30"
+      >
+        Add item
+      </button>
+    </div>
   );
 }
 
@@ -53,7 +119,7 @@ export default function SettingsPage() {
       </header>
 
       {modes.map((m) => (
-        <section key={m} className="rounded-xl2 bg-card border border-cardBorder p-4 mb-4">
+        <section key={m} className="rounded-xl3 glass p-4 mb-4">
           <h2 className="font-semibold capitalize mb-2">{m} targets</h2>
           <NumberField
             label="Calories"
@@ -83,7 +149,7 @@ export default function SettingsPage() {
         </section>
       ))}
 
-      <section className="rounded-xl2 bg-card border border-cardBorder p-4 mb-4">
+      <section className="rounded-xl3 glass p-4 mb-4">
         <h2 className="font-semibold mb-2">Nada Protein Milk</h2>
         <NumberField label="Calories / bottle" value={settings.nada.kcal} onChange={(v) => update({ ...settings, nada: { ...settings.nada, kcal: v } })} />
         <NumberField label="Protein (g)" value={settings.nada.protein} onChange={(v) => update({ ...settings, nada: { ...settings.nada, protein: v } })} />
@@ -92,7 +158,7 @@ export default function SettingsPage() {
         <NumberField label="Max bottles/day" value={settings.nada.maxPerDay} onChange={(v) => update({ ...settings, nada: { ...settings.nada, maxPerDay: v } })} />
       </section>
 
-      <section className="rounded-xl2 bg-card border border-cardBorder p-4 mb-4">
+      <section className="rounded-xl3 glass p-4 mb-4">
         <h2 className="font-semibold mb-2">Usual Meal</h2>
         <NumberField label="Calories" value={settings.usualMeal.kcal} onChange={(v) => update({ ...settings, usualMeal: { ...settings.usualMeal, kcal: v } })} />
         <NumberField label="Protein (g)" value={settings.usualMeal.protein} onChange={(v) => update({ ...settings, usualMeal: { ...settings.usualMeal, protein: v } })} />
@@ -100,16 +166,37 @@ export default function SettingsPage() {
         <NumberField label="Carbs (g)" value={settings.usualMeal.carbs} onChange={(v) => update({ ...settings, usualMeal: { ...settings.usualMeal, carbs: v } })} />
       </section>
 
-      <section className="rounded-xl2 bg-card border border-cardBorder p-4 mb-4">
+      <section className="rounded-xl3 glass p-4 mb-4">
         <h2 className="font-semibold mb-2">Nutrition Database — McDonald's UAE</h2>
         <p className="text-xs text-muted mb-3">
-          Values must come from official mcdonalds.com/ae nutrition pages. Items stay disabled (excluded from
-          recommendations) until marked Verified.
+          Only items that are both Enabled and Verified are used in recommendations. Add new McDonald&apos;s
+          items at the bottom — calories are auto-calculated from the macros.
         </p>
+        <div className="grid grid-cols-4 gap-2 text-[10px] uppercase tracking-wider text-muted px-0.5">
+          <span>kcal</span>
+          <span>protein</span>
+          <span>fat</span>
+          <span>carbs</span>
+        </div>
         {settings.foods.map((food, idx) => (
           <div key={food.id} className="border-b border-cardBorder/60 py-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-sm">{food.name}</span>
+              <span className="font-medium text-sm flex items-center gap-2">
+                {food.name}
+                {food.source?.startsWith("http") && (
+                  <a href={food.source} target="_blank" rel="noreferrer" className="text-[10px] text-gold/80 underline">
+                    source
+                  </a>
+                )}
+                {food.id.startsWith("custom-") && (
+                  <button
+                    onClick={() => update({ ...settings, foods: settings.foods.filter((f) => f.id !== food.id) })}
+                    className="text-[10px] text-[#ff8a7d] underline"
+                  >
+                    delete
+                  </button>
+                )}
+              </span>
               <label className="flex items-center gap-2 text-xs text-muted">
                 <input
                   type="checkbox"
@@ -159,9 +246,12 @@ export default function SettingsPage() {
             </label>
           </div>
         ))}
+        <AddItemForm
+          onAdd={(food) => update({ ...settings, foods: [...settings.foods, food] })}
+        />
       </section>
 
-      <section className="rounded-xl2 bg-card border border-cardBorder p-4 mb-4">
+      <section className="rounded-xl3 glass p-4 mb-4">
         <h2 className="font-semibold mb-2">History</h2>
         <button
           onClick={() => clearHistory()}

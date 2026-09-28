@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FoodItem, Targets } from "../types";
-import { findRecommendations } from "./optimizer";
+import { findRecommendations, sandwichSignature } from "./optimizer";
 
 const targets: Targets = { kcal: 2000, proteinMin: 140, fatMin: 50, fatMax: 60, carbsRef: 225 };
 
@@ -33,15 +33,29 @@ const nadaItem: FoodItem = {
 };
 
 describe("findRecommendations", () => {
-  it("returns no more than 5 combinations", () => {
-    const results = findRecommendations({
+  it("returns no more than the requested number of combinations", () => {
+    const opts = {
       eaten: { kcal: 329, protein: 17, fat: 3, carbs: 56 },
       targets,
       foods: testFoods,
       nadaItem,
       nadaBottlesRemaining: 3,
+    };
+    expect(findRecommendations(opts).length).toBeLessThanOrEqual(10);
+    expect(findRecommendations({ ...opts, maxResults: 3 }).length).toBeLessThanOrEqual(3);
+  });
+
+  it("never repeats the same sandwich mix twice (variety)", () => {
+    const results = findRecommendations({
+      eaten: { kcal: 329, protein: 17, fat: 3, carbs: 56 },
+      targets,
+      foods: testFoods,
+      nadaItem,
+      nadaBottlesRemaining: 4,
     });
-    expect(results.length).toBeLessThanOrEqual(5);
+    const sigs = results.map(sandwichSignature);
+    expect(new Set(sigs).size).toBe(sigs.length);
+    expect(results.length).toBeGreaterThan(3);
   });
 
   it("never recommends a combination that pushes fat past the hard max", () => {

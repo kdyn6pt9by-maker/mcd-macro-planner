@@ -1,64 +1,114 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { Combination } from "@/lib/types";
-import { combinationLabel } from "@/lib/engine/optimizer";
+import type { HistoryEntry } from "@/lib/storage";
 
 const LABEL_STYLES: Record<string, string> = {
   "BEST MATCH": "bg-gold text-black",
-  "MORE PROTEIN": "bg-success/20 text-success border border-success/50",
-  "HIGHER FAT": "bg-warn/20 text-warn border border-warn/50",
-  "LOWER CALORIES": "bg-blue-500/20 text-blue-300 border border-blue-500/50",
-  "FEWER SANDWICHES": "bg-white/10 text-muted border border-white/20",
+  "MORE PROTEIN": "bg-success/15 text-success ring-1 ring-success/40",
+  "HIGHER FAT": "bg-warn/15 text-warn ring-1 ring-warn/40",
+  "LOWER CALORIES": "bg-sky-400/15 text-sky-300 ring-1 ring-sky-400/40",
+  "FEWER SANDWICHES": "bg-white/10 text-[#e8d5d6] ring-1 ring-white/20",
 };
+
+export function relativeDay(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 interface Props {
   combo: Combination;
-  usedBefore: boolean;
+  index: number;
+  history?: HistoryEntry;
+  proteinTarget: number;
   onSelect: () => void;
 }
 
-export function RecommendationCard({ combo, usedBefore, onSelect }: Props) {
+export function RecommendationCard({ combo, index, history, proteinTarget, onSelect }: Props) {
+  const best = combo.labels.includes("BEST MATCH");
+  const proteinHit = combo.afterEating.protein >= proteinTarget;
+
   return (
-    <div className="rounded-xl2 bg-card border border-cardBorder p-4 animate-card-in">
-      <div className="flex flex-wrap gap-2 mb-2">
-        {combo.labels.map((l) => (
-          <span key={l} className={`text-xs font-bold px-2 py-1 rounded-full ${LABEL_STYLES[l] ?? "bg-white/10"}`}>
-            {l}
-          </span>
-        ))}
-        {usedBefore && (
-          <span className="text-xs font-bold px-2 py-1 rounded-full bg-white/10 text-muted">Used before ✓</span>
-        )}
-        {combo.hasUnverifiedItem && (
-          <span className="text-xs font-bold px-2 py-1 rounded-full bg-red/20 text-red border border-red/40">
-            unverified nutrition
-          </span>
-        )}
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 28, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, x: -40 }}
+      transition={{ delay: index * 0.08, type: "spring", stiffness: 260, damping: 24 }}
+      className={`relative rounded-xl3 p-[1px] ${
+        best ? "bg-gradient-to-br from-gold via-[#ff9f1c] to-red" : "bg-white/[0.06]"
+      }`}
+    >
+      <div className="rounded-[calc(1.75rem-1px)] bg-[#150709]/95 p-4">
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          {combo.labels.map((l) => (
+            <span key={l} className={`text-[10px] font-black tracking-wider px-2 py-1 rounded-full ${LABEL_STYLES[l] ?? "bg-white/10"}`}>
+              {l}
+            </span>
+          ))}
+          {history && (
+            <motion.span
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: index * 0.08 + 0.25, type: "spring", stiffness: 400 }}
+              className="text-[10px] font-bold px-2 py-1 rounded-full bg-violet-400/15 text-violet-300 ring-1 ring-violet-400/40"
+            >
+              ↺ Chosen {history.count}× · {relativeDay(history.lastUsed)}
+            </motion.span>
+          )}
+          <span className="ml-auto text-[11px] text-muted">#{index + 1}</span>
+        </div>
+
+        <div className="space-y-1.5 mb-4">
+          {combo.items.map(({ food, qty }) => (
+            <div key={food.id} className="flex items-center gap-2.5">
+              <span className="min-w-[2rem] h-7 px-1.5 rounded-lg bg-gold/15 text-gold text-sm font-black flex items-center justify-center">
+                {qty}×
+              </span>
+              <span className="font-semibold">{food.name}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-4 gap-1.5 text-center mb-3">
+          {[
+            { k: "kcal", v: combo.totals.kcal, c: "text-gold" },
+            { k: "protein", v: combo.totals.protein, c: "text-success" },
+            { k: "fat", v: combo.totals.fat, c: "text-warn" },
+            { k: "carbs", v: combo.totals.carbs, c: "text-carb" },
+          ].map((s) => (
+            <div key={s.k} className="rounded-xl bg-white/[0.03] py-2">
+              <div className={`text-base font-extrabold ${s.c}`}>+{s.v}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted">{s.k}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-xl bg-black/30 px-3 py-2.5 text-xs text-muted leading-5 mb-3">
+          <span className="text-[#e8d5d6] font-semibold">After eating:</span> {combo.afterEating.kcal} kcal ·{" "}
+          <span className={proteinHit ? "text-success font-semibold" : ""}>
+            {combo.afterEating.protein}g protein{proteinHit ? " ✓" : ""}
+          </span>{" "}
+          · {combo.afterEating.fat}g fat · {combo.afterEating.carbs}g carbs
+          <div className="text-gold font-semibold mt-0.5">
+            {combo.remainingKcal >= 0 ? `${combo.remainingKcal} kcal remaining` : `${-combo.remainingKcal} kcal over`}
+          </div>
+        </div>
+
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={onSelect}
+          className={`w-full rounded-2xl font-extrabold py-3 ${
+            best ? "bg-gold text-black" : "bg-white/[0.07] text-[#f7ecec] ring-1 ring-white/10"
+          }`}
+        >
+          {history ? "I'll eat this again" : "I'll eat this"}
+        </motion.button>
       </div>
-
-      <div className="text-lg font-semibold mb-3">{combinationLabel(combo)}</div>
-
-      <div className="text-sm text-muted mb-1">Adds:</div>
-      <div className="text-sm mb-3">
-        {combo.totals.kcal} kcal · {combo.totals.protein} g protein · {combo.totals.fat} g fat · {combo.totals.carbs} g carbs
-      </div>
-
-      <div className="text-sm text-muted mb-1">Day after eating:</div>
-      <div className="text-sm mb-3">
-        {combo.afterEating.kcal} kcal · {combo.afterEating.protein} g protein · {combo.afterEating.fat} g fat ·{" "}
-        {combo.afterEating.carbs} g carbs
-      </div>
-
-      <div className="text-sm text-gold font-medium mb-3">
-        {Math.max(0, combo.remainingKcal)} kcal remaining
-      </div>
-
-      <button
-        onClick={onSelect}
-        className="btn-tap w-full rounded-xl bg-gold text-black font-bold py-2.5"
-      >
-        I'll eat this
-      </button>
-    </div>
+    </motion.div>
   );
 }

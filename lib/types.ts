@@ -29,19 +29,26 @@ export interface Targets {
 }
 
 export interface Settings {
+  version: number;
   targets: Record<DayMode, Targets>;
   nada: Macros & { servingMl: number; maxPerDay: number };
   usualMeal: Macros & { label: string };
   foods: FoodItem[];
 }
 
+export type EntryKind = "usual" | "nada" | "custom" | "mcdonalds";
+
+export interface DayEntry {
+  id: string;
+  kind: EntryKind;
+  label: string;
+  macros: Macros;
+  at: string;
+}
+
 export interface DayState {
   date: string;
-  mode: DayMode;
-  eaten: Macros;
-  nadaCount: number;
-  usualMealAdded: boolean;
-  log: string[];
+  entries: DayEntry[];
 }
 
 export interface Combination {

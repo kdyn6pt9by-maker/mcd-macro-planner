@@ -137,7 +137,10 @@ export const defaultMcDonaldsFoods: FoodItem[] = [
   ),
 ];
 
+export const SETTINGS_VERSION = 2;
+
 export const defaultSettings: Settings = {
+  version: SETTINGS_VERSION,
   targets: {
     workday: { kcal: 2000, proteinMin: 140, fatMin: 50, fatMax: 60, carbsRef: 225 },
     weekend: { kcal: 2000, proteinMin: 140, fatMin: 50, fatMax: 60, carbsRef: 225 },
@@ -148,7 +151,7 @@ export const defaultSettings: Settings = {
     fat: 0.16,
     carbs: 32,
     servingMl: 320,
-    maxPerDay: 3,
+    maxPerDay: 4,
   },
   usualMeal: {
     label: "Rice Krispies 50g + Marmum Protein Milk 150ml",
