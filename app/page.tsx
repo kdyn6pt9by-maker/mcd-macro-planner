@@ -4,6 +4,7 @@ import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "framer-motio
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddFoodSheet } from "@/components/AddFoodSheet";
+import { McMenuSheet } from "@/components/McMenuSheet";
 import { CalorieRing } from "@/components/CalorieRing";
 import { MacroBar } from "@/components/MacroBar";
 import { RecommendationCard } from "@/components/RecommendationCard";
@@ -37,6 +38,7 @@ export default function HomePage() {
   const [day, setDay] = useState<DayState | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
   const [favorites, setFavorites] = useState<HistoryEntry[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
@@ -157,6 +159,19 @@ export default function HomePage() {
     setShowResults(true);
     setShowAll(false);
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  function addFromMenu(lines: { food: FoodItem; qty: number }[]) {
+    const entries: Omit<DayEntry, "id" | "at">[] = [];
+    for (const { food, qty } of lines) {
+      for (let i = 0; i < qty; i++) entries.push({ kind: "mcdonalds", label: food.name, macros: food.macros });
+    }
+    const key = lines.map((l) => `${l.food.id}x${l.qty}`).sort().join("|");
+    const label = lines.map((l) => `${l.qty} × ${l.food.name}`).join(" + ");
+    const kcal = Math.round(entries.reduce((n, e) => n + e.macros.kcal, 0));
+    addEntries(entries, `🍔 ${label} · +${kcal} kcal`);
+    recordCombinationUsed(key, label);
+    setFavorites(topFavorites());
   }
 
   function selectCombination(combo: Combination) {
@@ -337,6 +352,26 @@ export default function HomePage() {
             </div>
           </motion.button>
         </div>
+
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setMenuOpen(true)}
+          className="mt-2.5 w-full rounded-2xl p-4 flex items-center gap-3 text-left ring-1 ring-gold/30"
+          style={{ background: "linear-gradient(135deg,rgba(255,199,44,0.16),rgba(218,41,28,0.12))" }}
+        >
+          <motion.span
+            className="h-10 w-10 rounded-xl bg-gold text-xl flex items-center justify-center"
+            animate={{ rotate: [0, -8, 8, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 3 }}
+          >
+            🍟
+          </motion.span>
+          <span className="flex-1">
+            <span className="block font-bold">Pick from McDonald&apos;s menu</span>
+            <span className="block text-[11px] text-muted">Choose items yourself — one meal, not the whole day</span>
+          </span>
+          <span className="text-gold">›</span>
+        </motion.button>
 
         <motion.button
           whileTap={{ scale: 0.97 }}
@@ -547,6 +582,14 @@ export default function HomePage() {
         </footer>
       </main>
 
+      <McMenuSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        foods={settings.foods.filter((f) => f.enabled && f.verified)}
+        eaten={eaten}
+        targets={targets}
+        onAdd={addFromMenu}
+      />
       <AddFoodSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onAdd={addCustom} onSetTotals={setTotals} />
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </MotionConfig>
