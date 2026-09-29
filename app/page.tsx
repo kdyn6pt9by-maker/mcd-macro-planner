@@ -585,6 +585,19 @@ export default function HomePage() {
           <span className="text-muted rtl:rotate-180">›</span>
         </motion.button>
 
+        <Link href="/stats?tab=days" className="block mt-2.5">
+          <motion.div whileTap={{ scale: 0.97 }} className="w-full glass rounded-2xl p-4 flex items-center gap-3">
+            <span className="h-10 w-10 rounded-xl bg-sky-400/15 text-xl flex items-center justify-center">📅</span>
+            <span className="flex-1">
+              <span className="block font-bold">{t("Log a past day", "سجّل يوم فات")}</span>
+              <span className="block text-[11px] text-muted">
+                {t("Forgot a day? Add what you ate on any date", "نسيت يوم؟ أضف اللي أكلته لأي تاريخ")}
+              </span>
+            </span>
+            <span className="text-muted rtl:rotate-180">›</span>
+          </motion.div>
+        </Link>
+
         <div className="grid grid-cols-2 gap-2.5 mt-2.5">
           <motion.button
             whileTap={{ scale: 0.95 }}

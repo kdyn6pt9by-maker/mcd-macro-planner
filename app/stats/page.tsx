@@ -18,12 +18,19 @@ import {
   orderItems,
   recordCombinationUsed,
   saveDay,
+  saveSettings,
   todayKey,
   type HistoryEntry,
 } from "@/lib/storage";
-import { DayState, Macros, Settings } from "@/lib/types";
+import { DayState, FoodItem, Macros, Settings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { prunePayments } from "@/lib/insights";
+import { prunePayments, recentAmounts } from "@/lib/insights";
+import { appendToDay, setDayTotals, setPayment, type NewEntry } from "@/lib/logging";
+import { AddFoodSheet } from "@/components/AddFoodSheet";
+import { McMenuSheet } from "@/components/McMenuSheet";
+import { PayRequest, PaySheet } from "@/components/PaySheet";
+import { fromKey, toKey } from "@/lib/progress";
+import { useCallback } from "react";
 
 type Tab = "items" | "orders" | "days";
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -70,6 +77,14 @@ export default function StatsPage() {
   const [tab, setTab] = useState<Tab>("items");
   const [open, setOpen] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastData | null>(null);
+  const [logDate, setLogDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return toKey(d);
+  });
+  const [sheet, setSheet] = useState<"food" | "menu" | null>(null);
+  const [pay, setPay] = useState<PayRequest | null>(null);
+  const eatenOn = useCallback((date: string) => sumMacros(listDays().find((d) => d.date === date)?.entries.map((e) => e.macros) ?? []), []);
 
   const refresh = () => {
     setHistory(loadHistory());
@@ -82,6 +97,13 @@ export default function StatsPage() {
     const t = new URLSearchParams(window.location.search).get("tab");
     if (t === "orders" || t === "days" || t === "items") setTab(t);
   }, []);
+
+  function afterLog(date: string, text: string) {
+    refresh();
+    setTab("days");
+    setOpen(date);
+    showToast(text);
+  }
 
   if (!history || !settings) return null;
 
@@ -122,6 +144,48 @@ export default function StatsPage() {
       saveDay(d);
       refresh();
     });
+  }
+
+  const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const dayName = (date: string) => dayTitle(date, ar);
+
+  function addFood(label: string, macros: Macros, date: string, saveAsFavorite: boolean) {
+    appendToDay(date, [{ kind: "custom", label, macros }], false, uid);
+    if (saveAsFavorite && !settings!.savedMeals.some((m) => m.name === label)) {
+      const next = { ...settings!, savedMeals: [...settings!.savedMeals, { id: uid(), name: label, macros }] };
+      saveSettings(next);
+      setSettings(next);
+    }
+    afterLog(date, t(`${label} → ${dayName(date)}`, `${label} ← ${dayName(date)}`));
+  }
+
+  function setTotals(macros: Macros, date: string) {
+    setDayTotals(date, t("Day totals", "مجموع اليوم"), macros, uid);
+    afterLog(date, t(`Totals saved for ${dayName(date)}`, `انحفظ مجموع ${dayName(date)}`));
+  }
+
+  function addOrder(lines: { food: FoodItem; qty: number }[], date: string) {
+    const entries: NewEntry[] = lines.flatMap((l) => Array.from({ length: l.qty }, () => ({ kind: "mcdonalds" as const, label: l.food.name, macros: l.food.macros })));
+    const { groupId } = appendToDay(date, entries, true, uid);
+    const label = lines.map((l) => `${l.qty} × ${l.food.name}`).join(" + ");
+    recordCombinationUsed(
+      lines.map((l) => `${l.food.id}x${l.qty}`).sort().join("|"),
+      label,
+      lines.map((l) => ({ id: l.food.id, name: l.food.name, qty: l.qty, macros: l.food.macros }))
+    );
+    afterLog(date, t(`🍔 Added to ${dayName(date)}`, `🍔 انضاف لـ ${dayName(date)}`));
+    setPay({
+      date,
+      orderId: groupId!,
+      label,
+      kcal: entries.reduce((n, e) => n + e.macros.kcal, 0),
+      protein: entries.reduce((n, e) => n + e.macros.protein, 0),
+    });
+  }
+
+  function openLog(date: string, kind: "food" | "menu") {
+    setLogDate(date);
+    setSheet(kind);
   }
 
   const tabs: { id: Tab; label: string }[] = [
@@ -179,6 +243,44 @@ export default function StatsPage() {
           </button>
         ))}
       </div>
+
+      {tab === "days" && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl3 p-4 mb-3 ring-1 ring-gold/30"
+          style={{ background: "linear-gradient(135deg,rgba(255,199,44,0.14),rgba(218,41,28,0.10))" }}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">📅</span>
+            <div className="flex-1">
+              <div className="font-black">{t("Log a past day", "سجّل يوم فات")}</div>
+              <div className="text-[11px] text-muted">{t("Forgot to log? Pick the date and add what you ate.", "نسيت تسجل؟ اختار التاريخ وأضف اللي أكلته.")}</div>
+            </div>
+          </div>
+          <label className="mt-3 flex items-center gap-2 rounded-2xl bg-black/35 px-4 py-3 border border-white/5 focus-within:border-gold/60">
+            <span className="text-sm text-muted">{t("Date", "التاريخ")}</span>
+            <input
+              type="date"
+              max={toKey(new Date())}
+              value={logDate}
+              onChange={(e) => e.target.value && setLogDate(e.target.value)}
+              className="flex-1 bg-transparent text-end font-bold outline-none [color-scheme:dark]"
+            />
+          </label>
+          <div className="text-xs text-gold mt-1.5 text-center">
+            {fromKey(logDate).toLocaleDateString(ar ? "ar-AE-u-nu-latn" : "en-US", { weekday: "long", month: "long", day: "numeric" })}
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => openLog(logDate, "food")} className="rounded-2xl bg-gold text-black font-extrabold py-3 text-sm">
+              {t("+ Macros / food", "+ ماكروز / أكل")}
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => openLog(logDate, "menu")} className="rounded-2xl bg-white/10 font-extrabold py-3 text-sm">
+              {t("🍟 McDonald's", "🍟 ماكدونالدز")}
+            </motion.button>
+          </div>
+        </motion.div>
+      )}
 
       {(tab === "days" ? days.length === 0 : history.length === 0) ? (
         <motion.div key={tab} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass rounded-xl3 p-8 text-center">
@@ -354,9 +456,35 @@ export default function StatsPage() {
                             <DayLog
                               entries={d.entries}
                               payments={d.payments}
+                              onEditPayment={(orderId, label) => {
+                                const es = d.entries.filter((e) => e.groupId === orderId && e.kind === "mcdonalds");
+                                setPay({
+                                  date: d.date,
+                                  orderId,
+                                  label,
+                                  kcal: es.reduce((n, e) => n + e.macros.kcal, 0),
+                                  protein: es.reduce((n, e) => n + e.macros.protein, 0),
+                                });
+                              }}
                               onRemoveEntry={(id) => updateDay(d, d.entries.filter((e) => e.id !== id))}
                               onRemoveGroup={(g) => updateDay(d, d.entries.filter((e) => e.groupId !== g))}
                             />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 mt-3">
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => openLog(d.date, "food")}
+                              className="rounded-xl py-2.5 text-xs font-bold bg-gold/15 text-gold ring-1 ring-gold/30"
+                            >
+                              {t("+ Add food to this day", "+ أضف أكل لهذا اليوم")}
+                            </motion.button>
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => openLog(d.date, "menu")}
+                              className="rounded-xl py-2.5 text-xs font-bold bg-white/5 ring-1 ring-white/10"
+                            >
+                              {t("+ McDonald's order", "+ طلب ماكدونالدز")}
+                            </motion.button>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.97 }}
@@ -376,6 +504,34 @@ export default function StatsPage() {
         </div>
       )}
 
+      <AddFoodSheet
+        open={sheet === "food"}
+        initialDate={logDate}
+        savedMeals={settings.savedMeals}
+        onClose={() => setSheet(null)}
+        onAdd={addFood}
+        onSetTotals={setTotals}
+      />
+      <McMenuSheet
+        open={sheet === "menu"}
+        initialDate={logDate}
+        onClose={() => setSheet(null)}
+        foods={settings.foods.filter((f) => f.enabled && f.verified)}
+        eatenOn={eatenOn}
+        targets={settings.targets.workday}
+        onAdd={addOrder}
+      />
+      <PaySheet
+        request={pay}
+        recentAmounts={pay ? recentAmounts(listDays()) : []}
+        onSkip={() => setPay(null)}
+        onSave={(amount) => {
+          setPayment(pay!.date, pay!.orderId, pay!.label, amount, uid);
+          setPay(null);
+          refresh();
+          showToast(t(`💰 ${amount} AED saved`, `💰 انحفظ ${amount} درهم`));
+        }}
+      />
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </main>
   );

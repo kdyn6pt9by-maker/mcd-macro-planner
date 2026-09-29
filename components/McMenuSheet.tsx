@@ -13,6 +13,8 @@ type Sort = "protein" | "kcal" | "fat";
 
 interface Props {
   open: boolean;
+  /** Day preselected when the sheet opens (defaults to today). */
+  initialDate?: string;
   onClose: () => void;
   foods: FoodItem[];
   /** What was already eaten on a given day, so the preview matches the day you log to. */
@@ -21,7 +23,7 @@ interface Props {
   onAdd: (lines: { food: FoodItem; qty: number }[], date: string) => void;
 }
 
-export function McMenuSheet({ open, onClose, foods, eatenOn, targets, onAdd }: Props) {
+export function McMenuSheet({ open, initialDate, onClose, foods, eatenOn, targets, onAdd }: Props) {
   const { t } = useI18n();
   const SORTS: { id: Sort; label: string }[] = [
     { id: "protein", label: t("💪 Protein/kcal", "💪 بروتين/سعرة") },
@@ -36,9 +38,9 @@ export function McMenuSheet({ open, onClose, foods, eatenOn, targets, onAdd }: P
   useEffect(() => {
     if (open) {
       setQty({});
-      setDate(todayKey());
+      setDate(initialDate ?? todayKey());
     }
-  }, [open]);
+  }, [open, initialDate]);
   const eaten = useMemo(() => eatenOn(date), [eatenOn, date]);
   const isToday = date === todayKey();
 
