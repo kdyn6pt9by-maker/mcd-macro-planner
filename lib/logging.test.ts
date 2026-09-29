@@ -44,10 +44,10 @@ describe("logging to past days", () => {
       id
     );
     setPayment("2026-09-20", groupId!, "2 × Big Mac", 30, id);
-    setPayment("2026-09-20", groupId!, "2 × Big Mac", 32, id);
+    setPayment("2026-09-20", groupId!, "2 × Big Mac", 32, id, { esaad: true });
     const day = loadDay("2026-09-20");
     expect(new Set(day.entries.map((e) => e.groupId)).size).toBe(1);
-    expect(day.payments!.map((p) => p.amount)).toEqual([32]);
+    expect(day.payments!.map((p) => [p.amount, p.esaad])).toEqual([[32, true]]);
   });
 
   it("sets totals for a past day, replacing what was there", async () => {

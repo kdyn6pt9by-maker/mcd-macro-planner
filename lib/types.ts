@@ -31,7 +31,7 @@ export interface Targets {
 export interface Settings {
   version: number;
   targets: Record<DayMode, Targets>;
-  nada: Macros & { servingMl: number; maxPerDay: number };
+  nada: Macros & { servingMl: number; maxPerDay: number; /** AED per bottle, counted automatically for every Nada logged. */ price: number };
   usualMeal: Macros & { label: string };
   foods: FoodItem[];
   savedMeals: SavedMeal[];
@@ -53,6 +53,10 @@ export interface Payment {
   label: string;
   amount: number;
   at: string;
+  /** Paid with the Esaad card discount. */
+  esaad?: boolean;
+  /** Paid (fully or partly) with McDonald's reward points. */
+  points?: boolean;
 }
 
 export type EntryKind = "usual" | "nada" | "custom" | "mcdonalds";

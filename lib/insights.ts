@@ -8,6 +8,10 @@ export const KCAL_PER_KG = 7700;
 export interface SpendSummary {
   total: number;
   orders: number;
+  /** Orders paid with the Esaad discount / without it / using reward points. */
+  esaadOrders: number;
+  fullPriceOrders: number;
+  pointsOrders: number;
   avgPerOrder: number | null;
   /** AED for every 10 g of protein in the orders you paid for. */
   per10gProtein: number | null;
@@ -17,11 +21,15 @@ export function spending(days: DayState[], from: string, to: string): SpendSumma
   let total = 0;
   let orders = 0;
   let protein = 0;
+  let esaadOrders = 0;
+  let pointsOrders = 0;
   for (const d of days) {
     if (d.date < from || d.date > to) continue;
     for (const p of d.payments ?? []) {
       total += p.amount;
       orders++;
+      if (p.esaad) esaadOrders++;
+      if (p.points) pointsOrders++;
       protein += d.entries.filter((e) => e.groupId === p.orderId).reduce((n, e) => n + e.macros.protein, 0);
     }
   }
@@ -29,6 +37,9 @@ export function spending(days: DayState[], from: string, to: string): SpendSumma
   return {
     total,
     orders,
+    esaadOrders,
+    fullPriceOrders: orders - esaadOrders,
+    pointsOrders,
     avgPerOrder: orders ? Math.round((total / orders) * 100) / 100 : null,
     per10gProtein: protein > 0 ? Math.round((total / protein) * 10 * 100) / 100 : null,
   };
@@ -98,4 +109,48 @@ export function recentAmounts(days: DayState[], limit = 4): number[] {
     .sort((a, b) => b.at.localeCompare(a.at))
     .map((p) => p.amount);
   return [...new Set(all)].slice(0, limit);
+}
+
+/** A day where at least one order used the Esaad discount — highlighted in the Days list. */
+export const hasEsaad = (day: DayState) => (day.payments ?? []).some((p) => p.esaad);
+
+export interface DayCost {
+  mcd: number;
+  nada: number;
+  nadaBottles: number;
+  total: number;
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** What a day cost: McDonald's payments you entered + Nada bottles at a fixed price each. */
+export function dayCost(day: DayState, nadaPrice: number): DayCost {
+  const mcd = (day.payments ?? []).reduce((n, p) => n + p.amount, 0);
+  const nadaBottles = day.entries.filter((e) => e.kind === "nada").length;
+  const nada = nadaBottles * nadaPrice;
+  return { mcd: round2(mcd), nada: round2(nada), nadaBottles, total: round2(mcd + nada) };
+}
+
+export interface CostSummary extends DayCost {
+  days: number;
+  perDay: number | null;
+}
+
+/** Totals over a date range (inclusive), counting only days with any cost. */
+export function costSummary(days: DayState[], from: string, to: string, nadaPrice: number): CostSummary {
+  let mcd = 0;
+  let nada = 0;
+  let nadaBottles = 0;
+  let counted = 0;
+  for (const d of days) {
+    if (d.date < from || d.date > to) continue;
+    const c = dayCost(d, nadaPrice);
+    if (c.total === 0) continue;
+    mcd += c.mcd;
+    nada += c.nada;
+    nadaBottles += c.nadaBottles;
+    counted++;
+  }
+  const total = round2(mcd + nada);
+  return { mcd: round2(mcd), nada: round2(nada), nadaBottles, total, days: counted, perDay: counted ? round2(total / counted) : null };
 }

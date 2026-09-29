@@ -1,5 +1,7 @@
 "use client";
 
+import { foodEmoji } from "@/lib/foodEmoji";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { sumMacros } from "@/lib/engine/macros";
 import { DayEntry, EntryKind, Payment } from "@/lib/types";
@@ -48,6 +50,8 @@ function PaidBadge({ p, onEdit }: { p?: Payment; onEdit?: () => void }) {
       className={`text-[11px] font-bold px-2 py-1 rounded-lg ${p ? "bg-success/15 text-success" : "bg-white/5 text-muted"}`}
     >
       {p ? `💰 ${p.amount} ${t("AED", "د")}` : t("+ price", "+ السعر")}
+      {p?.esaad && <span className="ms-1 text-emerald-300">· {t("Esaad", "إسعاد")}</span>}
+      {p?.points && <span className="ms-1 text-violet-300">· ⭐</span>}
     </motion.button>
   );
 }
@@ -89,7 +93,7 @@ export function DayLog({
             >
               {single ? (
                 <div className="glass rounded-2xl px-4 py-3 flex items-center gap-3">
-                  <span className="text-lg">{KIND_ICON[e.kind]}</span>
+                  <span className="text-lg">{e.kind === "mcdonalds" ? foodEmoji(e.label) : KIND_ICON[e.kind]}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold truncate">{e.label}</div>
                     <div className="text-[11px] text-muted">{fmt(e.macros)}</div>
@@ -125,7 +129,7 @@ export function DayLog({
                           exit={{ opacity: 0, height: 0 }}
                           className="flex items-center gap-2 overflow-hidden"
                         >
-                          <span className="text-sm">{KIND_ICON[x.kind]}</span>
+                          <span className="text-sm">{x.kind === "mcdonalds" ? foodEmoji(x.label) : KIND_ICON[x.kind]}</span>
                           <div className="flex-1 min-w-0">
                             <div className="text-[13px] font-medium truncate">{x.label}</div>
                             <div className="text-[10px] text-muted">{fmt(x.macros)}</div>

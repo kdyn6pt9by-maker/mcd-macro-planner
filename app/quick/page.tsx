@@ -1,9 +1,11 @@
 "use client";
 
+import { foodEmoji } from "@/lib/foodEmoji";
+
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { PayRequest, PaySheet } from "@/components/PaySheet";
+import { PayFlags, PayRequest, PaySheet } from "@/components/PaySheet";
 import { roundMacros, sumMacros } from "@/lib/engine/macros";
 import { combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
 import { useI18n } from "@/lib/i18n";
@@ -78,11 +80,11 @@ export default function QuickPage() {
     setPay({ date: day.date, orderId, label, kcal: c.totals.kcal, protein });
   }
 
-  function savePayment(amount: number) {
+  function savePayment(amount: number, flags: PayFlags) {
     if (!pay || !day) return;
     const next = {
       ...day,
-      payments: [...(day.payments ?? []), { id: uid(), orderId: pay.orderId, label: pay.label, amount, at: new Date().toISOString() }],
+      payments: [...(day.payments ?? []), { id: uid(), orderId: pay.orderId, label: pay.label, amount, at: new Date().toISOString(), ...flags }],
     };
     saveDay(next);
     setDay(next);
@@ -151,7 +153,7 @@ export default function QuickPage() {
                   <div className="mt-2 space-y-1">
                     {c.items.map(({ food, qty }) => (
                       <div key={food.id} className="text-2xl font-black leading-tight">
-                        {qty}× {food.name}
+                        {qty}× {foodEmoji(food.id + food.name)} {food.name}
                       </div>
                     ))}
                   </div>

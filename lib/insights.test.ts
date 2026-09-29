@@ -17,12 +17,12 @@ describe("spending", () => {
     {
       date: "2026-09-28",
       entries: [e("a", 25, 500, "o1"), e("b", 15, 300, "o1"), e("n", 30)],
-      payments: [{ id: "p1", orderId: "o1", label: "x", amount: 32, at: "" }],
+      payments: [{ id: "p1", orderId: "o1", label: "x", amount: 32, at: "", esaad: true }],
     },
     {
       date: "2026-09-29",
       entries: [e("c", 40, 600, "o2")],
-      payments: [{ id: "p2", orderId: "o2", label: "y", amount: 28.5, at: "" }],
+      payments: [{ id: "p2", orderId: "o2", label: "y", amount: 28.5, at: "", points: true }],
     },
     { date: "2026-08-01", entries: [], payments: [{ id: "p3", orderId: "zz", label: "old", amount: 99, at: "" }] },
   ];
@@ -34,10 +34,19 @@ describe("spending", () => {
     expect(s.avgPerOrder).toBe(30.25);
     // 80 g protein in paid orders (Nada not included) → 60.5 / 80 * 10
     expect(s.per10gProtein).toBe(7.56);
+    expect([s.esaadOrders, s.fullPriceOrders, s.pointsOrders]).toEqual([1, 1, 1]);
   });
 
   it("handles no payments", () => {
-    expect(spending([], "2026-09-01", "2026-09-30")).toEqual({ total: 0, orders: 0, avgPerOrder: null, per10gProtein: null });
+    expect(spending([], "2026-09-01", "2026-09-30")).toEqual({
+      total: 0,
+      orders: 0,
+      esaadOrders: 0,
+      fullPriceOrders: 0,
+      pointsOrders: 0,
+      avgPerOrder: null,
+      per10gProtein: null,
+    });
   });
 });
 
@@ -100,5 +109,27 @@ describe("payment helpers", () => {
     };
     expect(prunePayments(day).payments!.map((p) => p.orderId)).toEqual(["keep"]);
     expect(recentAmounts([day])).toEqual([30, 25]);
+  });
+});
+
+describe("costs", () => {
+  const nadaEntry = (id: string): DayEntry => ({ id, kind: "nada", label: "Nada", macros: { kcal: 278, protein: 30, fat: 0, carbs: 32 }, at: "" });
+  const day1: DayState = {
+    date: "2026-09-28",
+    entries: [e("a", 25, 500, "o1"), nadaEntry("n1"), nadaEntry("n2")],
+    payments: [{ id: "p", orderId: "o1", label: "", amount: 24.5, at: "", esaad: true }],
+  };
+  const day2: DayState = { date: "2026-09-29", entries: [nadaEntry("n3")] };
+
+  it("prices each Nada bottle automatically and adds McDonald's payments", async () => {
+    const { dayCost } = await import("./insights");
+    expect(dayCost(day1, 6)).toEqual({ mcd: 24.5, nada: 12, nadaBottles: 2, total: 36.5 });
+    expect(dayCost(day2, 6)).toEqual({ mcd: 0, nada: 6, nadaBottles: 1, total: 6 });
+  });
+
+  it("sums a range and averages per day with spending", async () => {
+    const { costSummary } = await import("./insights");
+    const s = costSummary([day1, day2], "2026-09-01", "2026-09-30", 6);
+    expect(s).toEqual({ mcd: 24.5, nada: 18, nadaBottles: 3, total: 42.5, days: 2, perDay: 21.25 });
   });
 });

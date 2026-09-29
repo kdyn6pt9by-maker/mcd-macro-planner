@@ -34,7 +34,7 @@ function Section({ title, children, delay = 0 }: { title: string; children: Reac
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, type: "spring", stiffness: 220, damping: 24 }}
-      className="glass rounded-xl3 p-4 mb-4"
+      className="glass rounded-xl3 p-4 mb-4 relative"
     >
       <h2 className="text-[11px] uppercase tracking-[0.16em] text-muted mb-3">{title}</h2>
       {children}
@@ -279,6 +279,9 @@ export default function ProgressPage() {
       </AnimatePresence>
 
       <Section title={t("💰 McDonald's spending", "💰 مصروف ماكدونالدز")} delay={0.05}>
+        <Link href="/spending" className="absolute top-4 end-4 text-xs font-bold text-gold">
+          {t("Full spending →", "كل المصاريف ←")}
+        </Link>
         {spendMonth.orders === 0 ? (
           <p className="text-sm text-muted">
             {t(
@@ -310,6 +313,37 @@ export default function ProgressPage() {
                 value={spendMonth.per10gProtein !== null ? `${spendMonth.per10gProtein.toFixed(2)}` : "—"}
                 label={t(`${aed} per 10g protein`, `${aed} لكل 10 جرام بروتين`)}
               />
+            </div>
+            <div className="mt-3 rounded-2xl bg-black/25 p-3">
+              <div className="text-[11px] uppercase tracking-[0.14em] text-muted mb-2">{t("This month's orders", "طلبات هذا الشهر")}</div>
+              <div className="flex h-3 rounded-full overflow-hidden bg-white/5">
+                <motion.div
+                  className="bg-emerald-400"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(spendMonth.esaadOrders / spendMonth.orders) * 100}%` }}
+                  transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                />
+                <motion.div
+                  className="bg-white/30"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(spendMonth.fullPriceOrders / spendMonth.orders) * 100}%` }}
+                  transition={{ duration: 0.9, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-2.5 text-center">
+                <div>
+                  <div className="text-xl font-black text-emerald-300">{spendMonth.esaadOrders}</div>
+                  <div className="text-[10px] text-muted">💚 {t("with Esaad", "بخصم إسعاد")}</div>
+                </div>
+                <div>
+                  <div className="text-xl font-black">{spendMonth.fullPriceOrders}</div>
+                  <div className="text-[10px] text-muted">{t("without discount", "بدون خصم")}</div>
+                </div>
+                <div>
+                  <div className="text-xl font-black text-violet-300">{spendMonth.pointsOrders}</div>
+                  <div className="text-[10px] text-muted">⭐ {t("used points", "بالنقاط")}</div>
+                </div>
+              </div>
             </div>
             <p className="text-[11px] text-muted mt-2">
               {t("Tap the 💰 on any order in your log to add or fix a price.", "اضغط 💰 على أي طلب في سجلك عشان تضيف أو تعدل السعر.")}

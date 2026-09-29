@@ -7,9 +7,10 @@ import { AddFoodSheet } from "@/components/AddFoodSheet";
 import { CalorieRing } from "@/components/CalorieRing";
 import { Celebration } from "@/components/Celebration";
 import { DayLog } from "@/components/DayLog";
+import { DayCostBar } from "@/components/DayCostBar";
 import { MacroBar } from "@/components/MacroBar";
 import { McMenuSheet } from "@/components/McMenuSheet";
-import { PayRequest, PaySheet } from "@/components/PaySheet";
+import { PayFlags, PayRequest, PaySheet } from "@/components/PaySheet";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import { Toast, ToastData } from "@/components/Toast";
 import { UpdateBanner, isUpdateAvailable, reloadApp } from "@/components/UpdateBanner";
@@ -18,7 +19,7 @@ import { smartAdvice } from "@/lib/engine/advice";
 import { roundMacros, scaleMacros, sumMacros } from "@/lib/engine/macros";
 import { combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
 import { useI18n } from "@/lib/i18n";
-import { cloneEntries, prunePayments, recentAmounts } from "@/lib/insights";
+import { cloneEntries, costSummary, prunePayments, recentAmounts } from "@/lib/insights";
 import { STREAK_MILESTONE, fromKey, pendingWeekendDays, toKey, weekdayStreak } from "@/lib/progress";
 import {
   historyFor,
@@ -274,11 +275,11 @@ export default function HomePage() {
     }
   }
 
-  function savePayment(amount: number) {
+  function savePayment(amount: number, flags: PayFlags) {
     if (!pay) return;
     const target = pay.date === day?.date ? day : loadDay(pay.date);
     const payments = (target.payments ?? []).filter((p) => p.orderId !== pay.orderId);
-    persistDay({ ...target, payments: [...payments, { id: uid(), orderId: pay.orderId, label: pay.label, amount, at: new Date().toISOString() }] });
+    persistDay({ ...target, payments: [...payments, { id: uid(), orderId: pay.orderId, label: pay.label, amount, at: new Date().toISOString(), ...flags }] });
     setPay(null);
     showToast(t(`💰 ${amount} AED saved`, `💰 انحفظ ${amount} درهم`));
   }
@@ -310,6 +311,9 @@ export default function HomePage() {
   const todayLabel = fmtDate(new Date(), { weekday: "long", month: "short", day: "numeric" });
   const yesterdayKcal = yesterday ? Math.round(sumMacros(yesterday.entries.map((e) => e.macros)).kcal) : 0;
   const iconBtn = "h-10 w-10 rounded-2xl glass flex items-center justify-center text-lg";
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  const weekSpend = Math.round(costSummary(listDays(), toKey(weekAgo), todayKey(), settings.nada.price).total);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -335,6 +339,15 @@ export default function HomePage() {
                   🔥
                 </motion.span>
                 {streak > 0 ? t(`${streak}-day streak`, `سلسلة ${streak} أيام`) : t("Start a streak", "ابدأ سلسلة")}
+              </motion.span>
+            </Link>
+            <Link href="/spending" className="ms-1.5">
+              <motion.span
+                whileTap={{ scale: 0.92 }}
+                dir="auto"
+                className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/25"
+              >
+                💰 {weekSpend} {t("AED · 7d", "درهم · 7 أيام")}
               </motion.span>
             </Link>
           </div>
@@ -788,6 +801,7 @@ export default function HomePage() {
                 });
               }}
             />
+            <DayCostBar day={day} nadaPrice={settings.nada.price} />
           </section>
         )}
 

@@ -22,10 +22,17 @@ export function setDayTotals(date: string, label: string, macros: Macros, makeId
 }
 
 /** Records (or replaces) what was paid for one order on a given day. */
-export function setPayment(date: string, orderId: string, label: string, amount: number, makeId: () => string): DayState {
+export function setPayment(
+  date: string,
+  orderId: string,
+  label: string,
+  amount: number,
+  makeId: () => string,
+  flags: { esaad?: boolean; points?: boolean } = {}
+): DayState {
   const current = loadDay(date);
   const payments = (current.payments ?? []).filter((p) => p.orderId !== orderId);
-  const day = prunePayments({ ...current, payments: [...payments, { id: makeId(), orderId, label, amount, at: new Date().toISOString() }] });
+  const day = prunePayments({ ...current, payments: [...payments, { id: makeId(), orderId, label, amount, at: new Date().toISOString(), ...flags }] });
   saveDay(day);
   return day;
 }

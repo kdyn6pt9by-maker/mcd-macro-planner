@@ -152,6 +152,7 @@ export const defaultSettings: Settings = {
     carbs: 32,
     servingMl: 320,
     maxPerDay: 4,
+    price: 6,
   },
   usualMeal: {
     label: "Rice Krispies 50g + Marmum Protein Milk 150ml",

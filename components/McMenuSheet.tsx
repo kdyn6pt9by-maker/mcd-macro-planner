@@ -1,5 +1,7 @@
 "use client";
 
+import { foodEmoji } from "@/lib/foodEmoji";
+
 import { AnimatePresence, motion, useDragControls } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { addMacros, roundMacros, scaleMacros, ZERO_MACROS } from "@/lib/engine/macros";
@@ -133,7 +135,7 @@ export function McMenuSheet({ open, initialDate, onClose, foods, eatenOn, target
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm truncate">{f.name}</div>
+                      <div className="font-semibold text-sm truncate">{foodEmoji(f.id + f.name)} {f.name}</div>
                       <div className="text-[11px] text-muted mt-0.5">
                         <span className="text-gold">{f.macros.kcal}</span> kcal ·{" "}
                         <span className="text-success">P {f.macros.protein}</span> · <span className="text-warn">F {f.macros.fat}</span> ·{" "}

@@ -287,6 +287,7 @@ export default function SettingsPage() {
         <NumberField label={t("Fat (g)", "دهون (جرام)")} value={settings.nada.fat} onChange={(v) => update({ ...settings, nada: { ...settings.nada, fat: v } })} />
         <NumberField label={t("Carbs (g)", "كارب (جرام)")} value={settings.nada.carbs} onChange={(v) => update({ ...settings, nada: { ...settings.nada, carbs: v } })} />
         <NumberField label={t("Max bottles/day", "أقصى علب/يوم")} value={settings.nada.maxPerDay} onChange={(v) => update({ ...settings, nada: { ...settings.nada, maxPerDay: v } })} />
+        <NumberField label={t("Price / bottle (AED)", "السعر / علبة (درهم)")} value={settings.nada.price} onChange={(v) => update({ ...settings, nada: { ...settings.nada, price: v } })} />
       </section>
 
       <section className="rounded-xl3 glass p-4 mb-4">

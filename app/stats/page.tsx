@@ -1,10 +1,13 @@
 "use client";
 
+import { foodEmoji } from "@/lib/foodEmoji";
+
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { DayLog } from "@/components/DayLog";
+import { DayCostBar } from "@/components/DayCostBar";
 import { relativeDay } from "@/components/RecommendationCard";
 import { Toast, ToastData } from "@/components/Toast";
 import { roundMacros, scaleMacros, sumMacros } from "@/lib/engine/macros";
@@ -24,7 +27,7 @@ import {
 } from "@/lib/storage";
 import { DayState, FoodItem, Macros, Settings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
-import { prunePayments, recentAmounts } from "@/lib/insights";
+import { hasEsaad, prunePayments, recentAmounts } from "@/lib/insights";
 import { appendToDay, setDayTotals, setPayment, type NewEntry } from "@/lib/logging";
 import { AddFoodSheet } from "@/components/AddFoodSheet";
 import { McMenuSheet } from "@/components/McMenuSheet";
@@ -183,6 +186,57 @@ export default function StatsPage() {
     });
   }
 
+  function addUsual(date: string) {
+    const { label, ...m } = settings!.usualMeal;
+    appendToDay(date, [{ kind: "usual", label, macros: m }], false, uid);
+    afterLog(date, t(`🥣 Usual meal → ${dayName(date)}`, `🥣 الوجبة المعتادة ← ${dayName(date)}`));
+  }
+
+  function addNada(date: string) {
+    const n = settings!.nada;
+    appendToDay(date, [{ kind: "nada", label: "Nada Protein Milk", macros: { kcal: n.kcal, protein: n.protein, fat: n.fat, carbs: n.carbs } }], false, uid);
+    afterLog(date, t(`🥛 Nada → ${dayName(date)}`, `🥛 ندى ← ${dayName(date)}`));
+  }
+
+  /** Same one-tap buttons as the home screen, for any day. */
+  function QuickRow({ date }: { date: string }) {
+    const entries = days.find((d) => d.date === date)?.entries ?? [];
+    const usualDone = entries.some((e) => e.kind === "usual");
+    const nadaCount = entries.filter((e) => e.kind === "nada").length;
+    const max = settings!.nada.maxPerDay;
+    return (
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          disabled={usualDone}
+          onClick={() => addUsual(date)}
+          className="rounded-2xl bg-black/30 ring-1 ring-white/10 px-3 py-2.5 text-start disabled:opacity-40"
+        >
+          <div className="text-sm font-bold">🥣 {usualDone ? t("Usual meal ✓", "الوجبة المعتادة ✓") : t("+ Usual meal", "+ وجبتي المعتادة")}</div>
+          <div className="text-[10px] text-muted">
+            {settings!.usualMeal.kcal} kcal · {settings!.usualMeal.protein}g P
+          </div>
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          disabled={nadaCount >= max}
+          onClick={() => addNada(date)}
+          className="rounded-2xl bg-black/30 ring-1 ring-white/10 px-3 py-2.5 text-start disabled:opacity-40"
+        >
+          <div className="text-sm font-bold flex items-center justify-between">
+            <span>🥛 {t("+ Nada", "+ ندى")}</span>
+            {nadaCount > 0 && <span className="text-gold">×{nadaCount}</span>}
+          </div>
+          <div className="flex gap-1 mt-1.5">
+            {Array.from({ length: max }).map((_, i) => (
+              <span key={i} className={`h-1 flex-1 rounded-full ${i < nadaCount ? "bg-gold" : "bg-white/10"}`} />
+            ))}
+          </div>
+        </motion.button>
+      </div>
+    );
+  }
+
   function openLog(date: string, kind: "food" | "menu") {
     setLogDate(date);
     setSheet(kind);
@@ -279,6 +333,7 @@ export default function StatsPage() {
               {t("🍟 McDonald's", "🍟 ماكدونالدز")}
             </motion.button>
           </div>
+          <QuickRow date={logDate} />
         </motion.div>
       )}
 
@@ -306,7 +361,7 @@ export default function StatsPage() {
             >
               <div className="flex items-center gap-3">
                 <Rank i={i} />
-                <span className="flex-1 font-semibold">{nameOf(it.id)}</span>
+                <span className="flex-1 font-semibold">{foodEmoji(it.id)} {nameOf(it.id)}</span>
                 <span className="font-black text-gold">×{it.count}</span>
               </div>
               <div className="mt-2 ms-10 h-1.5 rounded-full bg-white/5 overflow-hidden">
@@ -373,7 +428,7 @@ export default function StatsPage() {
                                   <span className="min-w-[2rem] h-6 px-1 rounded-lg bg-gold/15 text-gold text-xs font-black flex items-center justify-center">
                                     {l.qty}×
                                   </span>
-                                  <span className="flex-1 text-sm font-semibold">{l.name}</span>
+                                  <span className="flex-1 text-sm font-semibold">{foodEmoji(l.id + l.name)} {l.name}</span>
                                   <span className="text-sm font-bold text-gold">{m.kcal}</span>
                                 </div>
                                 <div className="text-[11px] text-muted mt-0.5 ms-10">
@@ -417,15 +472,32 @@ export default function StatsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: 60, height: 0 }}
                   transition={{ delay: i * 0.04, layout: { type: "spring", stiffness: 400, damping: 35 } }}
-                  className={`glass rounded-2xl overflow-hidden ${isOpen ? "ring-1 ring-gold/40" : ""}`}
+                  className={`rounded-2xl overflow-hidden ${
+                    hasEsaad(d) ? "ring-1 ring-emerald-400/50" : isOpen ? "glass ring-1 ring-gold/40" : "glass"
+                  }`}
+                  style={
+                    hasEsaad(d)
+                      ? { background: "linear-gradient(150deg, rgba(16,185,129,0.20), rgba(24,8,10,0.85) 60%)" }
+                      : undefined
+                  }
                 >
                   <button onClick={() => setOpen(isOpen ? null : d.date)} className="w-full px-4 py-3 flex items-center gap-3 text-start">
-                    <span className="text-lg">📅</span>
+                    <span className="text-lg">{hasEsaad(d) ? "💚" : "📅"}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold">
+                      <div className="text-sm font-bold flex flex-wrap items-center gap-x-2 gap-y-1">
                         {dayTitle(d.date, ar)}
+                        {hasEsaad(d) && (
+                          <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-emerald-400/20 text-emerald-300">
+                            {t("ESAAD", "إسعاد")}
+                          </span>
+                        )}
+                        {d.payments?.some((p) => p.points) && (
+                          <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-violet-400/20 text-violet-300">
+                            ⭐ {t("POINTS", "نقاط")}
+                          </span>
+                        )}
                         {!!d.payments?.length && (
-                          <span className="ms-2 text-[11px] font-bold text-success">
+                          <span className="text-[11px] font-bold text-success">
                             💰 {Math.round(d.payments.reduce((n, p) => n + p.amount, 0) * 100) / 100} {t("AED", "د")}
                           </span>
                         )}
@@ -470,6 +542,7 @@ export default function StatsPage() {
                               onRemoveGroup={(g) => updateDay(d, d.entries.filter((e) => e.groupId !== g))}
                             />
                           </div>
+                          <DayCostBar day={d} nadaPrice={settings.nada.price} />
                           <div className="grid grid-cols-2 gap-2 mt-3">
                             <motion.button
                               whileTap={{ scale: 0.95 }}
@@ -486,6 +559,7 @@ export default function StatsPage() {
                               {t("+ McDonald's order", "+ طلب ماكدونالدز")}
                             </motion.button>
                           </div>
+                          <QuickRow date={d.date} />
                           <motion.button
                             whileTap={{ scale: 0.97 }}
                             onClick={() => removeDay(d)}
@@ -525,8 +599,8 @@ export default function StatsPage() {
         request={pay}
         recentAmounts={pay ? recentAmounts(listDays()) : []}
         onSkip={() => setPay(null)}
-        onSave={(amount) => {
-          setPayment(pay!.date, pay!.orderId, pay!.label, amount, uid);
+        onSave={(amount, flags) => {
+          setPayment(pay!.date, pay!.orderId, pay!.label, amount, uid, flags);
           setPay(null);
           refresh();
           showToast(t(`💰 ${amount} AED saved`, `💰 انحفظ ${amount} درهم`));

@@ -1,5 +1,7 @@
 "use client";
 
+import { foodEmoji } from "@/lib/foodEmoji";
+
 import { useI18n } from "@/lib/i18n";
 
 import { motion } from "framer-motion";
@@ -80,7 +82,7 @@ export function RecommendationCard({ combo, index, history, proteinTarget, onSel
               <span className="min-w-[2rem] h-7 px-1.5 rounded-lg bg-gold/15 text-gold text-sm font-black flex items-center justify-center">
                 {qty}×
               </span>
-              <span className="font-semibold">{food.name}</span>
+              <span className="font-semibold">{foodEmoji(food.id + food.name)} {food.name}</span>
             </div>
           ))}
         </div>
