@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddFoodSheet } from "@/components/AddFoodSheet";
 import { McMenuSheet } from "@/components/McMenuSheet";
+import { DayLog } from "@/components/DayLog";
 import { CalorieRing } from "@/components/CalorieRing";
 import { MacroBar } from "@/components/MacroBar";
 import { RecommendationCard } from "@/components/RecommendationCard";
@@ -17,20 +18,21 @@ import {
   loadMode,
   loadSettings,
   recordCombinationUsed,
+  requestPersistentStorage,
+  todayKey,
   saveDay,
   saveMode,
   historyFor,
   topFavorites,
   type HistoryEntry,
 } from "@/lib/storage";
-import { Combination, DayEntry, DayMode, DayState, EntryKind, FoodItem, Macros, Settings } from "@/lib/types";
+import { Combination, DayEntry, DayMode, DayState, FoodItem, Macros, Settings } from "@/lib/types";
 
 const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
 type Filter = "all" | "beef" | "chicken";
 const isChicken = (f: FoodItem) => /chicken|nugget/i.test(f.id + f.name);
 
-const KIND_ICON: Record<EntryKind, string> = { usual: "🥣", nada: "🥛", custom: "🍽️", mcdonalds: "🍔" };
 
 export default function HomePage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -51,6 +53,13 @@ export default function HomePage() {
     setSettings(loadSettings());
     setDay(loadDay());
     setFavorites(topFavorites());
+    requestPersistentStorage();
+    // If the app stays open past midnight, roll over to a fresh day (yesterday stays in the archive).
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setDay((d) => (d && d.date !== todayKey() ? loadDay() : d));
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   const showToast = useCallback((text: string, undo?: () => void) => {
@@ -97,7 +106,8 @@ export default function HomePage() {
 
   function addEntries(newEntries: Omit<DayEntry, "id" | "at">[], toastText: string) {
     if (!day) return;
-    const stamped = newEntries.map((e) => ({ ...e, id: uid(), at: new Date().toISOString() }));
+    const groupId = newEntries.length > 1 ? uid() : undefined;
+    const stamped = newEntries.map((e) => ({ ...e, id: uid(), at: new Date().toISOString(), groupId }));
     const ids = new Set(stamped.map((e) => e.id));
     const next = { ...day, entries: [...day.entries, ...stamped] };
     persist(next);
@@ -141,10 +151,18 @@ export default function HomePage() {
     showToast("Removed", () => persist(prev));
   }
 
+  function removeGroup(groupId: string) {
+    if (!day) return;
+    const prev = day;
+    persist({ ...day, entries: day.entries.filter((e) => e.groupId !== groupId) });
+    showToast("Meal deleted", () => persist(prev));
+  }
+
   function undoLast() {
     if (!day || day.entries.length === 0) return;
     const last = day.entries[day.entries.length - 1];
-    removeEntry(last.id);
+    if (last.groupId) removeGroup(last.groupId);
+    else removeEntry(last.id);
   }
 
   function resetDay() {
@@ -170,7 +188,11 @@ export default function HomePage() {
     const label = lines.map((l) => `${l.qty} × ${l.food.name}`).join(" + ");
     const kcal = Math.round(entries.reduce((n, e) => n + e.macros.kcal, 0));
     addEntries(entries, `🍔 ${label} · +${kcal} kcal`);
-    recordCombinationUsed(key, label);
+    recordCombinationUsed(
+      key,
+      label,
+      lines.map((l) => ({ id: l.food.id, name: l.food.name, qty: l.qty, macros: l.food.macros }))
+    );
     setFavorites(topFavorites());
   }
 
@@ -184,7 +206,11 @@ export default function HomePage() {
       }
     }
     addEntries(entries, `Enjoy! ${label}`);
-    recordCombinationUsed(key, label);
+    recordCombinationUsed(
+      key,
+      label,
+      combo.items.map(({ food, qty }) => ({ id: food.id, name: food.name, qty, macros: food.macros }))
+    );
     setFavorites(topFavorites());
     setShowResults(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -539,41 +565,13 @@ export default function HomePage() {
         {/* Today's log */}
         {day.entries.length > 0 && (
           <section className="mt-8">
-            <h2 className="text-sm font-bold text-muted uppercase tracking-[0.16em] mb-3">Today</h2>
-            <motion.ul layout className="space-y-2">
-              <AnimatePresence initial={false}>
-                {day.entries.map((e) => (
-                  <motion.li
-                    key={e.id}
-                    layout
-                    initial={{ opacity: 0, height: 0, y: -8 }}
-                    animate={{ opacity: 1, height: "auto", y: 0 }}
-                    exit={{ opacity: 0, height: 0, x: 60 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="glass rounded-2xl px-4 py-3 flex items-center gap-3">
-                      <span className="text-lg">{KIND_ICON[e.kind]}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold truncate">{e.label}</div>
-                        <div className="text-[11px] text-muted">
-                          {Math.round(e.macros.kcal)} kcal · P {Math.round(e.macros.protein)} · F{" "}
-                          {Math.round(e.macros.fat * 10) / 10} · C {Math.round(e.macros.carbs)}
-                        </div>
-                      </div>
-                      <motion.button
-                        whileTap={{ scale: 0.85 }}
-                        onClick={() => removeEntry(e.id)}
-                        aria-label={`Remove ${e.label}`}
-                        className="h-8 w-8 rounded-full bg-white/5 text-muted flex items-center justify-center"
-                      >
-                        ✕
-                      </motion.button>
-                    </div>
-                  </motion.li>
-                ))}
-              </AnimatePresence>
-            </motion.ul>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-muted uppercase tracking-[0.16em]">Today</h2>
+              <Link href="/stats?tab=days" className="text-xs font-bold text-gold">
+                Past days →
+              </Link>
+            </div>
+            <DayLog entries={day.entries} onRemoveEntry={removeEntry} onRemoveGroup={removeGroup} />
           </section>
         )}
 

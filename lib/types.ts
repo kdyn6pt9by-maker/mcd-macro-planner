@@ -44,6 +44,8 @@ export interface DayEntry {
   label: string;
   macros: Macros;
   at: string;
+  /** Entries added in one action (a McDonald's order, a recommendation) share a groupId so they can be deleted as one meal. */
+  groupId?: string;
 }
 
 export interface DayState {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { clearHistory, loadSettings, saveSettings } from "@/lib/storage";
+import { clearHistory, exportBackup, importBackup, listDays, loadSettings, requestPersistentStorage, saveSettings } from "@/lib/storage";
 import { kcalFromMacros } from "@/lib/engine/macros";
 import { DayMode, FoodItem, Settings } from "@/lib/types";
 
@@ -90,6 +90,69 @@ function AddItemForm({ onAdd }: { onAdd: (food: FoodItem) => void }) {
         Add item
       </button>
     </div>
+  );
+}
+
+function BackupSection() {
+  const [persisted, setPersisted] = useState<boolean | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    requestPersistentStorage().then(setPersisted);
+  }, []);
+
+  function download() {
+    const blob = new Blob([JSON.stringify(exportBackup(), null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `mcd-macro-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setMsg(`Backup saved (${listDays().length} days).`);
+  }
+
+  async function restore(file: File) {
+    try {
+      if (!window.confirm("Restore this backup? It replaces the data currently on this device.")) return;
+      if (importBackup(await file.text())) {
+        setMsg("Backup restored — reloading…");
+        setTimeout(() => window.location.reload(), 600);
+      } else setMsg("That file isn't a McD Macro backup.");
+    } catch {
+      setMsg("Couldn't read that file.");
+    }
+  }
+
+  return (
+    <section className="rounded-xl3 glass p-4 mb-4">
+      <h2 className="font-semibold mb-1">Your data</h2>
+      <p className="text-xs text-muted mb-3 leading-5">
+        Everything is saved on this device and survives app updates. Days are kept until you delete them.
+        {persisted === true && <span className="text-success"> Storage is protected from automatic cleanup ✓</span>}
+        <br />
+        Tip: the Home Screen app and Safari keep separate data — always open it from the same place, and save a
+        backup now and then.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={download} className="btn-tap rounded-xl bg-gold text-black font-bold py-2.5 text-sm">
+          ⬇ Save backup
+        </button>
+        <label className="btn-tap rounded-xl bg-white/10 font-bold py-2.5 text-sm text-center cursor-pointer">
+          ⬆ Restore
+          <input
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) restore(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+      {msg && <p className="text-xs text-gold mt-2">{msg}</p>}
+    </section>
   );
 }
 
@@ -251,10 +314,14 @@ export default function SettingsPage() {
         />
       </section>
 
+      <BackupSection />
+
       <section className="rounded-xl3 glass p-4 mb-4">
         <h2 className="font-semibold mb-2">History</h2>
         <button
-          onClick={() => clearHistory()}
+          onClick={() => {
+            if (window.confirm("Clear all favorites / order history? Logged days are kept.")) clearHistory();
+          }}
           className="btn-tap w-full rounded-xl bg-red/20 text-red border border-red/40 py-2 text-sm font-semibold"
         >
           Clear favorites / history

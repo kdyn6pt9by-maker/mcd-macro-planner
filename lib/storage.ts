@@ -1,4 +1,4 @@
-import { DayMode, DayState, Settings } from "./types";
+import { DayMode, DayState, FoodItem, Macros, Settings } from "./types";
 import { SETTINGS_VERSION, defaultSettings } from "./data/defaultSettings";
 
 const SETTINGS_KEY = "mcd-planner:settings";
@@ -6,13 +6,33 @@ const DAY_KEY = "mcd-planner:day";
 const MODE_KEY = "mcd-planner:mode";
 const HISTORY_KEY = "mcd-planner:history";
 
+const DAYS_KEY = "mcd-planner:days";
+const BACKUP_FORMAT = "mcd-macro-backup";
+
 function safeGet<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
+  let raw: string | null = null;
   try {
-    const raw = window.localStorage.getItem(key);
+    raw = window.localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
   } catch {
+    // Never silently lose data: park the unreadable value before anything overwrites it.
+    if (raw) {
+      try {
+        window.localStorage.setItem(`${key}:corrupt-${Date.now()}`, raw);
+      } catch {}
+    }
     return fallback;
+  }
+}
+
+/** Ask the browser not to evict our storage under pressure (best effort; iOS home-screen apps are already exempt). */
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    if (typeof navigator === "undefined" || !navigator.storage?.persist) return false;
+    return (await navigator.storage.persisted()) || (await navigator.storage.persist());
+  } catch {
+    return false;
   }
 }
 
@@ -61,18 +81,50 @@ export function todayKey(now: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-export function emptyDay(): DayState {
-  return { date: todayKey(), entries: [] };
+export function emptyDay(date = todayKey()): DayState {
+  return { date, entries: [] };
 }
 
-export function loadDay(): DayState {
-  const stored = safeGet<DayState | null>(DAY_KEY, null);
-  if (stored && stored.date === todayKey() && Array.isArray(stored.entries)) return stored;
-  return emptyDay();
+/** Every logged day, keyed by local date. Days are kept forever unless you delete them. */
+export function loadAllDays(): Record<string, DayState> {
+  const days = safeGet<Record<string, DayState>>(DAYS_KEY, {});
+  // One-time move of the pre-archive single-day slot, so the last logged day isn't lost.
+  const legacy = safeGet<DayState | null>(DAY_KEY, null);
+  if (legacy && Array.isArray(legacy.entries) && legacy.entries.length && !days[legacy.date]) {
+    days[legacy.date] = legacy;
+    safeSet(DAYS_KEY, days);
+  }
+  if (legacy && typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(DAY_KEY);
+    } catch {}
+  }
+  return days;
+}
+
+export function loadDay(date = todayKey()): DayState {
+  const day = loadAllDays()[date];
+  return day && Array.isArray(day.entries) ? day : emptyDay(date);
 }
 
 export function saveDay(day: DayState) {
-  safeSet(DAY_KEY, day);
+  const days = loadAllDays();
+  if (day.entries.length === 0) delete days[day.date];
+  else days[day.date] = day;
+  safeSet(DAYS_KEY, days);
+}
+
+export function deleteDay(date: string) {
+  const days = loadAllDays();
+  delete days[date];
+  safeSet(DAYS_KEY, days);
+}
+
+/** Past days, newest first. */
+export function listDays(): DayState[] {
+  return Object.values(loadAllDays())
+    .filter((d) => d.entries.length > 0)
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export function loadMode(): DayMode {
@@ -88,22 +140,73 @@ export interface HistoryEntry {
   label: string;
   count: number;
   lastUsed: string;
+  /** Snapshot of what was in the order when it was chosen, so details survive later menu edits. */
+  items?: OrderItem[];
+}
+
+export interface OrderItem {
+  id: string;
+  name: string;
+  qty: number;
+  macros: Macros;
 }
 
 export function loadHistory(): HistoryEntry[] {
   return safeGet<HistoryEntry[]>(HISTORY_KEY, []);
 }
 
-export function recordCombinationUsed(key: string, label: string) {
+export function recordCombinationUsed(key: string, label: string, items?: OrderItem[]) {
   const history = loadHistory();
   const existing = history.find((h) => h.key === key);
   if (existing) {
     existing.count += 1;
     existing.lastUsed = new Date().toISOString();
+    if (items) existing.items = items;
   } else {
-    history.push({ key, label, count: 1, lastUsed: new Date().toISOString() });
+    history.push({ key, label, count: 1, lastUsed: new Date().toISOString(), items });
   }
   safeSet(HISTORY_KEY, history);
+}
+
+export function deleteHistoryEntry(key: string) {
+  safeSet(
+    HISTORY_KEY,
+    loadHistory().filter((h) => h.key !== key)
+  );
+}
+
+/** Items in an order: the saved snapshot, or rebuilt from the key + current menu for older records. */
+export function orderItems(entry: HistoryEntry, foods: FoodItem[], nada: Macros): OrderItem[] {
+  if (entry.items?.length) return entry.items;
+  return entry.key.split("|").flatMap((part) => {
+    const m = /^(.+)x(\d+)$/.exec(part);
+    if (!m) return [];
+    const id = m[1];
+    const food = id === "nada" ? { name: "Nada Protein Milk", macros: nada } : foods.find((f) => f.id === id);
+    if (!food) return [];
+    return [{ id, name: food.name, qty: Number(m[2]), macros: food.macros }];
+  });
+}
+
+interface Backup {
+  format: typeof BACKUP_FORMAT;
+  exportedAt: string;
+  data: Record<string, unknown>;
+}
+
+export function exportBackup(): Backup {
+  const data: Record<string, unknown> = {};
+  for (const key of [SETTINGS_KEY, DAYS_KEY, MODE_KEY, HISTORY_KEY]) data[key] = safeGet<unknown>(key, null);
+  return { format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), data };
+}
+
+export function importBackup(json: string): boolean {
+  const parsed = JSON.parse(json) as Backup;
+  if (parsed?.format !== BACKUP_FORMAT || typeof parsed.data !== "object") return false;
+  for (const [key, value] of Object.entries(parsed.data)) {
+    if (key.startsWith("mcd-planner:") && value !== null) safeSet(key, value);
+  }
+  return true;
 }
 
 export function clearHistory() {
