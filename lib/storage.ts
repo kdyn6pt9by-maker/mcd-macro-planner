@@ -1,5 +1,6 @@
 import { DayMode, DayState, FoodItem, Macros, Settings } from "./types";
 import { SETTINGS_VERSION, defaultSettings } from "./data/defaultSettings";
+import type { WeightEntry } from "./progress";
 
 const SETTINGS_KEY = "mcd-planner:settings";
 const DAY_KEY = "mcd-planner:day";
@@ -7,6 +8,9 @@ const MODE_KEY = "mcd-planner:mode";
 const HISTORY_KEY = "mcd-planner:history";
 
 const DAYS_KEY = "mcd-planner:days";
+const WEIGHTS_KEY = "mcd-planner:weights";
+const WEEKEND_SKIP_KEY = "mcd-planner:weekend-skipped";
+const CELEBRATED_KEY = "mcd-planner:celebrated-streak";
 const BACKUP_FORMAT = "mcd-macro-backup";
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -196,7 +200,7 @@ interface Backup {
 
 export function exportBackup(): Backup {
   const data: Record<string, unknown> = {};
-  for (const key of [SETTINGS_KEY, DAYS_KEY, MODE_KEY, HISTORY_KEY]) data[key] = safeGet<unknown>(key, null);
+  for (const key of [SETTINGS_KEY, DAYS_KEY, MODE_KEY, HISTORY_KEY, WEIGHTS_KEY, WEEKEND_SKIP_KEY, CELEBRATED_KEY]) data[key] = safeGet<unknown>(key, null);
   return { format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), data };
 }
 
@@ -236,4 +240,38 @@ export function itemTotals(history: HistoryEntry[] = loadHistory()): { id: strin
     }
   }
   return Array.from(totals, ([id, count]) => ({ id, count })).sort((a, b) => b.count - a.count);
+}
+
+export function loadWeights(): WeightEntry[] {
+  return safeGet<WeightEntry[]>(WEIGHTS_KEY, []).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** One weigh-in per date; logging again the same day replaces it. */
+export function saveWeight(entry: WeightEntry) {
+  safeSet(WEIGHTS_KEY, [...loadWeights().filter((w) => w.date !== entry.date), entry]);
+}
+
+export function deleteWeight(date: string) {
+  safeSet(
+    WEIGHTS_KEY,
+    loadWeights().filter((w) => w.date !== date)
+  );
+}
+
+export function loadWeekendSkips(): string[] {
+  return safeGet<string[]>(WEEKEND_SKIP_KEY, []);
+}
+
+export function skipWeekendDays(dates: string[]) {
+  // Keep the list short: only the last ~3 months matter.
+  const keep = [...new Set([...loadWeekendSkips(), ...dates])].sort().slice(-30);
+  safeSet(WEEKEND_SKIP_KEY, keep);
+}
+
+export function loadCelebratedStreak(): number {
+  return safeGet<number>(CELEBRATED_KEY, 0);
+}
+
+export function saveCelebratedStreak(n: number) {
+  safeSet(CELEBRATED_KEY, n);
 }

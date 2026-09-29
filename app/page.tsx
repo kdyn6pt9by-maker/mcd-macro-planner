@@ -6,6 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddFoodSheet } from "@/components/AddFoodSheet";
 import { McMenuSheet } from "@/components/McMenuSheet";
 import { DayLog } from "@/components/DayLog";
+import { Celebration } from "@/components/Celebration";
+import { UpdateBanner, isUpdateAvailable, reloadApp } from "@/components/UpdateBanner";
+import { WeekendCheckIn } from "@/components/WeekendCheckIn";
+import { STREAK_MILESTONE, pendingWeekendDays, weekdayStreak } from "@/lib/progress";
 import { CalorieRing } from "@/components/CalorieRing";
 import { MacroBar } from "@/components/MacroBar";
 import { RecommendationCard } from "@/components/RecommendationCard";
@@ -17,8 +21,13 @@ import {
   loadDay,
   loadMode,
   loadSettings,
+  loadAllDays,
+  loadCelebratedStreak,
+  loadWeekendSkips,
   recordCombinationUsed,
   requestPersistentStorage,
+  saveCelebratedStreak,
+  skipWeekendDays,
   todayKey,
   saveDay,
   saveMode,
@@ -41,6 +50,9 @@ export default function HomePage() {
   const [showResults, setShowResults] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [weekendDates, setWeekendDates] = useState<string[]>([]);
+  const [celebrate, setCelebrate] = useState<number | null>(null);
+  const [streak, setStreak] = useState(0);
   const [toast, setToast] = useState<ToastData | null>(null);
   const [favorites, setFavorites] = useState<HistoryEntry[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
@@ -55,8 +67,12 @@ export default function HomePage() {
     setFavorites(topFavorites());
     requestPersistentStorage();
     // If the app stays open past midnight, roll over to a fresh day (yesterday stays in the archive).
+    const checkWeekend = () => setWeekendDates(pendingWeekendDays(loadAllDays(), loadWeekendSkips()));
+    checkWeekend();
     const onVisible = () => {
-      if (document.visibilityState === "visible") setDay((d) => (d && d.date !== todayKey() ? loadDay() : d));
+      if (document.visibilityState !== "visible") return;
+      setDay((d) => (d && d.date !== todayKey() ? loadDay() : d));
+      checkWeekend();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
@@ -72,6 +88,28 @@ export default function HomePage() {
     setDay(next);
     saveDay(next);
   }, []);
+
+  // Streak uses workday targets (it only counts Mon–Fri). Celebrate each new multiple of 5 once.
+  useEffect(() => {
+    if (!settings || !day) return;
+    const s = weekdayStreak(loadAllDays(), settings.targets.workday);
+    setStreak(s);
+    const celebrated = loadCelebratedStreak();
+    if (s < celebrated) saveCelebratedStreak(s - (s % STREAK_MILESTONE));
+    else if (s > 0 && s % STREAK_MILESTONE === 0 && s > celebrated) {
+      saveCelebratedStreak(s);
+      setCelebrate(s);
+    }
+  }, [settings, day]);
+
+  function saveWeekend(logs: { date: string; macros: Macros }[], skipped: string[]) {
+    for (const { date, macros } of logs) {
+      saveDay({ date, entries: [{ id: uid(), at: new Date().toISOString(), kind: "custom", label: "Weekend totals", macros }] });
+    }
+    if (skipped.length) skipWeekendDays(skipped);
+    setWeekendDates([]);
+    showToast(logs.length ? `Weekend saved · ${logs.length} ${logs.length === 1 ? "day" : "days"} 🌴` : "Got it — weekend skipped");
+  }
 
   const targets = settings?.targets[mode];
   const eaten = useMemo(() => sumMacros(day?.entries.map((e) => e.macros) ?? []), [day]);
@@ -250,17 +288,46 @@ export default function HomePage() {
               <span className="gold-text">McD</span> Macro
             </h1>
             <p className="text-xs text-muted mt-0.5">{today}</p>
+            <Link href="/progress">
+              <motion.span
+                whileTap={{ scale: 0.92 }}
+                className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  streak > 0 ? "bg-gradient-to-r from-[#ff5a1f]/25 to-gold/20 text-gold ring-1 ring-gold/30" : "bg-white/5 text-muted"
+                }`}
+              >
+                <motion.span animate={streak > 0 ? { scale: [1, 1.25, 1] } : {}} transition={{ duration: 1.4, repeat: Infinity }}>
+                  🔥
+                </motion.span>
+                {streak > 0 ? `${streak}-day streak` : "Start a streak"}
+              </motion.span>
+            </Link>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 shrink-0">
+          <motion.button
+            whileTap={{ scale: 0.9, rotate: -180 }}
+            onClick={async () => {
+              showToast((await isUpdateAvailable()) ? "Updating…" : "Refreshing…");
+              setTimeout(reloadApp, 350);
+            }}
+            aria-label="Refresh app"
+            className="h-10 w-10 rounded-2xl glass flex items-center justify-center text-lg text-muted"
+          >
+            ↻
+          </motion.button>
+          <Link href="/progress" aria-label="Progress">
+            <motion.div whileTap={{ scale: 0.9 }} className="h-10 w-10 rounded-2xl glass flex items-center justify-center text-lg">
+              📈
+            </motion.div>
+          </Link>
           <Link href="/stats" aria-label="My stats">
-            <motion.div whileTap={{ scale: 0.9 }} className="h-11 w-11 rounded-2xl glass flex items-center justify-center text-lg">
+            <motion.div whileTap={{ scale: 0.9 }} className="h-10 w-10 rounded-2xl glass flex items-center justify-center text-lg">
               📊
             </motion.div>
           </Link>
           <Link href="/settings" aria-label="Settings">
             <motion.div
               whileTap={{ scale: 0.9, rotate: 60 }}
-              className="h-11 w-11 rounded-2xl glass flex items-center justify-center"
+              className="h-10 w-10 rounded-2xl glass flex items-center justify-center"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
                 <circle cx="12" cy="12" r="3" />
@@ -313,6 +380,32 @@ export default function HomePage() {
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Evening nudge: weekday after 7pm with protein still short */}
+        {(() => {
+          const now = new Date();
+          const short = Math.round(targets.proteinMin - eaten.protein);
+          if (now.getDay() % 6 === 0 || now.getHours() < 19 || short <= 0) return null;
+          const nadaLeft = settings.nada.maxPerDay - nadaCount;
+          return (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-4 rounded-2xl px-4 py-3 text-sm flex gap-3 items-center ring-1 ring-violet-400/30"
+              style={{ background: "linear-gradient(135deg,rgba(139,92,246,0.18),rgba(30,10,40,0.5))" }}
+            >
+              <motion.span className="text-2xl" animate={{ rotate: [0, -12, 0] }} transition={{ duration: 2, repeat: Infinity }}>
+                🌙
+              </motion.span>
+              <span className="flex-1 leading-5">
+                <b>{short}g protein</b> to go tonight{streak > 0 ? ` — protect your ${streak}-day streak` : ""}.
+                {nadaLeft > 0 && short <= settings.nada.protein * nadaLeft && (
+                  <span className="text-muted"> {Math.ceil(short / settings.nada.protein)} Nada would do it.</span>
+                )}
+              </span>
+            </motion.div>
+          );
+        })()}
 
         {/* Advice */}
         <AnimatePresence mode="wait">
@@ -590,6 +683,9 @@ export default function HomePage() {
       />
       <AddFoodSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onAdd={addCustom} onSetTotals={setTotals} />
       <Toast toast={toast} onDismiss={() => setToast(null)} />
+      <UpdateBanner />
+      <WeekendCheckIn dates={weekendDates} onSave={saveWeekend} />
+      <Celebration streak={celebrate} onDone={() => setCelebrate(null)} />
     </MotionConfig>
   );
 }
