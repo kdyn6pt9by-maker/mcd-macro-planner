@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { AnimatePresence, motion } from "framer-motion";
 
 export interface ToastData {
@@ -9,6 +11,7 @@ export interface ToastData {
 }
 
 export function Toast({ toast, onDismiss }: { toast: ToastData | null; onDismiss: () => void }) {
+  const { t } = useI18n();
   return (
     <div
       className="fixed inset-x-0 z-30 flex justify-center px-4 pointer-events-none"
@@ -22,7 +25,7 @@ export function Toast({ toast, onDismiss }: { toast: ToastData | null; onDismiss
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 400, damping: 28 }}
-            className="pointer-events-auto glass rounded-2xl pl-4 pr-2 py-2 flex items-center gap-3 max-w-md w-full"
+            className="pointer-events-auto glass rounded-2xl ps-4 pe-2 py-2 flex items-center gap-3 max-w-md w-full"
           >
             <span className="text-sm flex-1">{toast.text}</span>
             {toast.undo && (
@@ -33,7 +36,7 @@ export function Toast({ toast, onDismiss }: { toast: ToastData | null; onDismiss
                 }}
                 className="text-sm font-bold text-gold px-3 py-1.5 rounded-xl hover:bg-white/5"
               >
-                Undo
+                {t("Undo", "تراجع")}
               </button>
             )}
           </motion.div>

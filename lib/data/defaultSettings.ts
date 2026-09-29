@@ -137,7 +137,7 @@ export const defaultMcDonaldsFoods: FoodItem[] = [
   ),
 ];
 
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 export const defaultSettings: Settings = {
   version: SETTINGS_VERSION,
@@ -161,4 +161,6 @@ export const defaultSettings: Settings = {
     carbs: 56,
   },
   foods: defaultMcDonaldsFoods,
+  savedMeals: [],
+  language: "en",
 };

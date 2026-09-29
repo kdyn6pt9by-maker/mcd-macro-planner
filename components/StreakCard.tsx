@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { motion } from "framer-motion";
 import { nextMilestone, STREAK_MILESTONE, WeekdayStatus } from "@/lib/progress";
 import { AnimatedNumber } from "./AnimatedNumber";
@@ -12,10 +14,15 @@ const STYLE: Record<WeekdayStatus, string> = {
 };
 
 const MESSAGES = [
-  (n: number) => (n === 0 ? "Start today — hit protein, stay under fat." : ""),
-  (n: number) => (n % STREAK_MILESTONE === 0 ? `🏆 ${n}-day milestone reached! Next stop: ${n + STREAK_MILESTONE}.` : ""),
-  (n: number, left: number) => (left === 1 ? `One more weekday to ${n + 1}! 🔥` : ""),
-  (n: number, left: number) => `${left} weekdays to your next milestone.`,
+  (n: number, _l: number, ar: boolean) => (n === 0 ? (ar ? "ابدأ اليوم — وصّل البروتين وخلك تحت حد الدهون." : "Start today — hit protein, stay under fat.") : ""),
+  (n: number, _l: number, ar: boolean) =>
+    n % STREAK_MILESTONE === 0
+      ? ar
+        ? `🏆 وصلت ${n} أيام! المحطة الجاية: ${n + STREAK_MILESTONE}.`
+        : `🏆 ${n}-day milestone reached! Next stop: ${n + STREAK_MILESTONE}.`
+      : "",
+  (n: number, left: number, ar: boolean) => (left === 1 ? (ar ? `يوم دوام واحد وتوصل ${n + 1}! 🔥` : `One more weekday to ${n + 1}! 🔥`) : ""),
+  (_n: number, left: number, ar: boolean) => (ar ? `باقي ${left} أيام دوام للمحطة الجاية.` : `${left} weekdays to your next milestone.`),
 ];
 
 export function StreakCard({
@@ -27,10 +34,11 @@ export function StreakCard({
   week: { date: string; label: string; status: WeekdayStatus }[];
   compact?: boolean;
 }) {
+  const { t, ar } = useI18n();
   const next = nextMilestone(streak);
   const left = next - streak;
   const pct = ((STREAK_MILESTONE - left) / STREAK_MILESTONE) * 100;
-  const message = MESSAGES.map((m) => m(streak, left)).find(Boolean);
+  const message = MESSAGES.map((m) => m(streak, left, ar)).find(Boolean);
 
   return (
     <div className="glass rounded-xl3 p-4 relative overflow-hidden">
@@ -43,14 +51,14 @@ export function StreakCard({
           🔥
         </motion.div>
         <div className="flex-1">
-          <div className="text-[11px] uppercase tracking-[0.16em] text-muted">Weekday streak</div>
+          <div className="text-[11px] uppercase tracking-[0.16em] text-muted">{t("Weekday streak", "سلسلة أيام الدوام")}</div>
           <div className="text-3xl font-black leading-none mt-0.5">
             <AnimatedNumber value={streak} />
-            <span className="text-sm font-semibold text-muted"> {streak === 1 ? "day" : "days"}</span>
+            <span className="text-sm font-semibold text-muted"> {streak === 1 ? t("day", "يوم") : t("days", "أيام")}</span>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-muted">Next</div>
+        <div className="text-end">
+          <div className="text-[10px] uppercase tracking-wider text-muted">{t("Next", "الجاي")}</div>
           <div className="text-lg font-black gold-text">🏆 {next}</div>
         </div>
       </div>
@@ -86,7 +94,10 @@ export function StreakCard({
           </div>
           <p className="text-xs text-muted mt-2">{message}</p>
           <p className="text-[10px] text-muted/70 mt-1">
-            Mon–Fri only · a day counts when protein is hit, fat ≤ max and calories ≤ target +100. Weekends never break it.
+            {t(
+              "Mon–Fri only · a day counts when protein is hit, fat ≤ max and calories ≤ target +100. Weekends never break it.",
+              "الاثنين–الجمعة فقط · اليوم ينحسب إذا وصلت البروتين، والدهون تحت الحد، والسعرات ما تعدت الهدف +100. الويكند ما يكسر السلسلة."
+            )}
           </p>
         </>
       )}

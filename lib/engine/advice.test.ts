@@ -32,6 +32,11 @@ describe("smartAdvice", () => {
     expect(msg).toMatch(/finish the remaining calories yourself/i);
   });
 
+  it("speaks Arabic when asked", () => {
+    expect(smartAdvice({ kcal: 1600, protein: 145, fat: 40, carbs: 180 }, targets, true, "ar")).toMatch(/البروتين خلص/);
+    expect(smartAdvice({ kcal: 1000, protein: 128, fat: 20, carbs: 100 }, targets, true, "ar")).toMatch(/ندى/);
+  });
+
   it("suggests a Nada bottle when protein shortfall is small", () => {
     const msg = smartAdvice({ kcal: 1000, protein: 128, fat: 20, carbs: 100 }, targets, true);
     expect(msg).toMatch(/nada/i);

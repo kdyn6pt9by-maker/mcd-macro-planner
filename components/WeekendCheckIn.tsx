@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { kcalFromMacros } from "@/lib/engine/macros";
@@ -24,6 +26,7 @@ interface Props {
 }
 
 export function WeekendCheckIn({ dates, onSave }: Props) {
+  const { t, date } = useI18n();
   const [values, setValues] = useState<Record<string, Fields>>({});
   const [skip, setSkip] = useState<Record<string, boolean>>({});
 
@@ -64,11 +67,13 @@ export function WeekendCheckIn({ dates, onSave }: Props) {
               🌴
             </motion.div>
             <h2 className="text-2xl font-black mt-1">
-              Weekend <span className="gold-text">check-in</span>
+              {t("Weekend", "تسجيل")} <span className="gold-text">{t("check-in", "الويكند")}</span>
             </h2>
             <p className="text-xs text-muted mt-1 mb-4 leading-5">
-              You didn&apos;t log {dates.length === 2 ? "Saturday and Sunday" : "this day"}. Rough totals are fine — calories are
-              calculated for you. Weekends never affect your streak, but they keep your averages honest.
+              {t(
+                `You didn't log ${dates.length === 2 ? "Saturday and Sunday" : "this day"}. Rough totals are fine — calories are calculated for you. Weekends never affect your streak, but they keep your averages honest.`,
+                `ما سجلت ${dates.length === 2 ? "السبت والأحد" : "هذا اليوم"}. تقريبي يكفي — السعرات تنحسب لحالها. الويكند ما يأثر على السلسلة، بس يخلي متوسطاتك دقيقة.`
+              )}
             </p>
 
             <div className="space-y-3">
@@ -85,19 +90,19 @@ export function WeekendCheckIn({ dates, onSave }: Props) {
                     className={`rounded-2xl p-3.5 ring-1 transition-colors ${skipped ? "bg-white/[0.02] ring-white/5" : "bg-black/30 ring-gold/20"}`}
                   >
                     <div className="flex items-center justify-between mb-2.5">
-                      <span className="font-bold">{fromKey(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</span>
+                      <span className="font-bold">{date(fromKey(d), { weekday: "long", month: "short", day: "numeric" })}</span>
                       <button
                         onClick={() => setSkip((s) => ({ ...s, [d]: !s[d] }))}
                         className={`text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors ${skipped ? "bg-white/15 text-[#f7ecec]" : "bg-white/5 text-muted"}`}
                       >
-                        {skipped ? "✓ Didn't track" : "Didn't track"}
+                        {skipped ? t("✓ Didn't track", "✓ ما سجلت") : t("Didn't track", "ما سجلت")}
                       </button>
                     </div>
                     <motion.div animate={{ opacity: skipped ? 0.3 : 1 }} className={skipped ? "pointer-events-none" : ""}>
                       <div className="grid grid-cols-4 gap-2">
                         {(["protein", "carbs", "fat", "kcal"] as const).map((k) => (
                           <label key={k} className="block">
-                            <span className="text-[10px] uppercase tracking-wider text-muted">{k === "kcal" ? "kcal (opt.)" : k}</span>
+                            <span className="text-[10px] uppercase tracking-wider text-muted">{k === "kcal" ? t("kcal (opt.)", "سعرات (اختياري)") : k === "protein" ? t("protein", "بروتين") : k === "carbs" ? t("carbs", "كارب") : t("fat", "دهون")}</span>
                             <input
                               type="number"
                               inputMode="decimal"
@@ -124,7 +129,7 @@ export function WeekendCheckIn({ dates, onSave }: Props) {
               onClick={submit}
               className="mt-5 w-full rounded-2xl bg-gold text-black font-extrabold py-4 text-lg disabled:opacity-30 transition-opacity"
             >
-              {ready ? "Save weekend" : "Fill in or mark “Didn't track”"}
+              {ready ? t("Save weekend", "احفظ الويكند") : t("Fill in or mark “Didn't track”", "عبّي أو اختار “ما سجلت”")}
             </motion.button>
           </motion.div>
         </>

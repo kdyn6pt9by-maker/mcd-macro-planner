@@ -22,19 +22,22 @@ import {
   type HistoryEntry,
 } from "@/lib/storage";
 import { DayState, Macros, Settings } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
+import { prunePayments } from "@/lib/insights";
 
 type Tab = "items" | "orders" | "days";
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 function MacroGrid({ m }: { m: Macros }) {
+  const { t } = useI18n();
   const r = roundMacros(m);
   return (
     <div className="grid grid-cols-4 gap-1.5 text-center">
       {[
-        { k: "kcal", v: r.kcal, c: "text-gold" },
-        { k: "protein", v: r.protein, c: "text-success" },
-        { k: "fat", v: r.fat, c: "text-warn" },
-        { k: "carbs", v: r.carbs, c: "text-carb" },
+        { k: t("kcal", "سعرة"), v: r.kcal, c: "text-gold" },
+        { k: t("protein", "بروتين"), v: r.protein, c: "text-success" },
+        { k: t("fat", "دهون"), v: r.fat, c: "text-warn" },
+        { k: t("carbs", "كارب"), v: r.carbs, c: "text-carb" },
       ].map((s) => (
         <div key={s.k} className="rounded-xl bg-white/[0.04] py-1.5">
           <div className={`font-extrabold ${s.c}`}>{s.v}</div>
@@ -53,13 +56,14 @@ function Rank({ i }: { i: number }) {
   );
 }
 
-function dayTitle(date: string) {
-  if (date === todayKey()) return "Today";
+function dayTitle(date: string, ar = false) {
+  if (date === todayKey()) return ar ? "اليوم" : "Today";
   const d = new Date(`${date}T12:00:00`);
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return d.toLocaleDateString(ar ? "ar-AE-u-nu-latn" : "en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
 export default function StatsPage() {
+  const { t, ar } = useI18n();
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [days, setDays] = useState<DayState[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -87,7 +91,7 @@ export default function StatsPage() {
   };
 
   const nameOf = (id: string) =>
-    id === "nada" ? "Nada Protein Milk" : settings.foods.find((f) => f.id === id)?.name ?? id;
+    id === "nada" ? t("Nada Protein Milk", "حليب ندى بروتين") : settings.foods.find((f) => f.id === id)?.name ?? id;
   const items = itemTotals(history);
   const orders = [...history].sort((a, b) => b.count - a.count || b.lastUsed.localeCompare(a.lastUsed));
   const totalOrders = history.reduce((n, h) => n + h.count, 0);
@@ -96,7 +100,7 @@ export default function StatsPage() {
   function removeOrder(o: HistoryEntry) {
     deleteHistoryEntry(o.key);
     refresh();
-    showToast("Order removed from stats", () => {
+    showToast(t("Order removed from stats", "انشال الطلب من الإحصائيات"), () => {
       for (let i = 0; i < o.count; i++) recordCombinationUsed(o.key, o.label, o.items);
       refresh();
     });
@@ -105,43 +109,43 @@ export default function StatsPage() {
   function removeDay(d: DayState) {
     deleteDay(d.date);
     refresh();
-    showToast(`${dayTitle(d.date)} deleted`, () => {
+    showToast(t(`${dayTitle(d.date)} deleted`, `انحذف ${dayTitle(d.date, true)}`), () => {
       saveDay(d);
       refresh();
     });
   }
 
   function updateDay(d: DayState, entries: DayState["entries"]) {
-    saveDay({ ...d, entries });
+    saveDay(prunePayments({ ...d, entries }));
     refresh();
-    showToast("Removed", () => {
+    showToast(t("Removed", "انحذف"), () => {
       saveDay(d);
       refresh();
     });
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "items", label: "Sandwiches" },
-    { id: "orders", label: "Orders" },
-    { id: "days", label: "Days" },
+    { id: "items", label: t("Sandwiches", "السندويشات") },
+    { id: "orders", label: t("Orders", "الطلبات") },
+    { id: "days", label: t("Days", "الأيام") },
   ];
 
   return (
     <main className="max-w-md mx-auto px-4 pb-24" style={{ paddingTop: "max(1.25rem, env(safe-area-inset-top))" }}>
       <header className="flex items-center gap-3 mb-6">
-        <Link href="/" className="h-11 w-11 rounded-2xl glass flex items-center justify-center text-muted" aria-label="Back">
-          ←
+        <Link href="/" className="h-11 w-11 rounded-2xl glass flex items-center justify-center text-muted" aria-label={t("Back", "رجوع")}>
+          <span className="rtl:rotate-180">←</span>
         </Link>
         <h1 className="text-2xl font-black">
-          My <span className="gold-text">Stats</span>
+          {t("My", "")} <span className="gold-text">{t("Stats", "إحصائياتي")}</span>
         </h1>
       </header>
 
       <div className="grid grid-cols-3 gap-2.5 mb-6">
         {[
-          { label: "Orders", value: totalOrders },
-          { label: "Unique", value: history.length },
-          { label: "Days logged", value: days.length },
+          { label: t("Orders", "الطلبات"), value: totalOrders },
+          { label: t("Unique", "مختلفة"), value: history.length },
+          { label: t("Days logged", "أيام مسجلة"), value: days.length },
         ].map((s, i) => (
           <motion.div
             key={s.label}
@@ -181,11 +185,11 @@ export default function StatsPage() {
           <motion.div className="text-5xl mb-3" animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
             {tab === "days" ? "📅" : "🍔"}
           </motion.div>
-          <p className="font-bold">{tab === "days" ? "No days logged yet" : "No orders yet"}</p>
+          <p className="font-bold">{tab === "days" ? t("No days logged yet", "ما في أيام مسجلة") : t("No orders yet", "ما في طلبات للحين")}</p>
           <p className="text-sm text-muted mt-1">
             {tab === "days"
-              ? "Everything you log is kept here, day by day."
-              : "Pick from the menu or tap “I'll eat this” on a recommendation."}
+              ? t("Everything you log is kept here, day by day.", "كل شي تسجله ينحفظ هنا، يوم بيوم.")
+              : t("Pick from the menu or tap “I'll eat this” on a recommendation.", "اختار من المنيو أو اضغط “باكل هذا” على أي توصية.")}
           </p>
         </motion.div>
       ) : tab === "items" ? (
@@ -203,7 +207,7 @@ export default function StatsPage() {
                 <span className="flex-1 font-semibold">{nameOf(it.id)}</span>
                 <span className="font-black text-gold">×{it.count}</span>
               </div>
-              <div className="mt-2 ml-10 h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div className="mt-2 ms-10 h-1.5 rounded-full bg-white/5 overflow-hidden">
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: "linear-gradient(90deg,#ff9f1c,#ffc72c)" }}
@@ -230,12 +234,12 @@ export default function StatsPage() {
                 transition={{ delay: i * 0.04, layout: { type: "spring", stiffness: 400, damping: 35 } }}
                 className={`glass rounded-2xl overflow-hidden ${isOpen ? "ring-1 ring-gold/40" : ""}`}
               >
-                <button onClick={() => setOpen(isOpen ? null : o.key)} className="w-full px-4 py-3 flex items-center gap-3 text-left">
+                <button onClick={() => setOpen(isOpen ? null : o.key)} className="w-full px-4 py-3 flex items-center gap-3 text-start">
                   <Rank i={i} />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold">{o.label}</div>
                     <div className="text-[11px] text-muted">
-                      {Math.round(total.kcal)} kcal · last {relativeDay(o.lastUsed)}
+                      {Math.round(total.kcal)} kcal · {t("last", "آخر مرة")} {relativeDay(o.lastUsed, ar)}
                     </div>
                   </div>
                   <span className="font-black text-gold">×{o.count}</span>
@@ -270,23 +274,23 @@ export default function StatsPage() {
                                   <span className="flex-1 text-sm font-semibold">{l.name}</span>
                                   <span className="text-sm font-bold text-gold">{m.kcal}</span>
                                 </div>
-                                <div className="text-[11px] text-muted mt-0.5 ml-10">
+                                <div className="text-[11px] text-muted mt-0.5 ms-10">
                                   <span className="text-success">P {m.protein}g</span> · <span className="text-warn">F {m.fat}g</span> ·{" "}
                                   <span className="text-carb">C {m.carbs}g</span>
-                                  {l.qty > 1 && <span> · each {Math.round(l.macros.kcal)} kcal</span>}
+                                  {l.qty > 1 && <span> · {t("each", "الواحد")} {Math.round(l.macros.kcal)} kcal</span>}
                                 </div>
                               </motion.div>
                             );
                           })}
                         </div>
-                        <div className="text-[11px] uppercase tracking-[0.14em] text-muted mb-1.5">Order total</div>
+                        <div className="text-[11px] uppercase tracking-[0.14em] text-muted mb-1.5">{t("Order total", "مجموع الطلب")}</div>
                         <MacroGrid m={total} />
                         <motion.button
                           whileTap={{ scale: 0.97 }}
                           onClick={() => removeOrder(o)}
                           className="mt-3 w-full rounded-xl py-2.5 text-xs font-bold bg-red/15 text-[#ff8a7d] ring-1 ring-red/30"
                         >
-                          Remove this order from stats
+                          {t("Remove this order from stats", "شيل هذا الطلب من الإحصائيات")}
                         </motion.button>
                       </div>
                     </motion.div>
@@ -313,10 +317,17 @@ export default function StatsPage() {
                   transition={{ delay: i * 0.04, layout: { type: "spring", stiffness: 400, damping: 35 } }}
                   className={`glass rounded-2xl overflow-hidden ${isOpen ? "ring-1 ring-gold/40" : ""}`}
                 >
-                  <button onClick={() => setOpen(isOpen ? null : d.date)} className="w-full px-4 py-3 flex items-center gap-3 text-left">
+                  <button onClick={() => setOpen(isOpen ? null : d.date)} className="w-full px-4 py-3 flex items-center gap-3 text-start">
                     <span className="text-lg">📅</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold">{dayTitle(d.date)}</div>
+                      <div className="text-sm font-bold">
+                        {dayTitle(d.date, ar)}
+                        {!!d.payments?.length && (
+                          <span className="ms-2 text-[11px] font-bold text-success">
+                            💰 {Math.round(d.payments.reduce((n, p) => n + p.amount, 0) * 100) / 100} {t("AED", "د")}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-muted">
                         {Math.round(total.kcal)} kcal ·{" "}
                         <span className={total.protein >= target.proteinMin ? "text-success" : ""}>P {Math.round(total.protein)}</span> ·{" "}
@@ -324,7 +335,7 @@ export default function StatsPage() {
                         {Math.round(total.carbs)}
                       </div>
                     </div>
-                    <span className="text-[11px] text-muted">{d.entries.length} {d.entries.length === 1 ? "log" : "logs"}</span>
+                    <span className="text-[11px] text-muted">{d.entries.length} {d.entries.length === 1 ? t("log", "عنصر") : t("logs", "عناصر")}</span>
                     <motion.span animate={{ rotate: isOpen ? 90 : 0 }} className="text-muted">
                       ›
                     </motion.span>
@@ -342,6 +353,7 @@ export default function StatsPage() {
                           <div className="mt-3">
                             <DayLog
                               entries={d.entries}
+                              payments={d.payments}
                               onRemoveEntry={(id) => updateDay(d, d.entries.filter((e) => e.id !== id))}
                               onRemoveGroup={(g) => updateDay(d, d.entries.filter((e) => e.groupId !== g))}
                             />
@@ -351,7 +363,7 @@ export default function StatsPage() {
                             onClick={() => removeDay(d)}
                             className="mt-3 w-full rounded-xl py-2.5 text-xs font-bold bg-red/15 text-[#ff8a7d] ring-1 ring-red/30"
                           >
-                            Delete whole day
+                            {t("Delete whole day", "احذف اليوم كامل")}
                           </motion.button>
                         </div>
                       </motion.div>

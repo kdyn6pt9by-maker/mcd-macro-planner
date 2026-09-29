@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { fromKey } from "@/lib/progress";
@@ -29,6 +31,7 @@ function niceMax(v: number) {
 }
 
 export function BarChart({ points, target, targetLabel, unit, color, goal }: Props) {
+  const { t, date } = useI18n();
   const [active, setActive] = useState<number | null>(null);
   const values = points.map((p) => p.value ?? 0);
   const yMax = niceMax(Math.max(target, ...values));
@@ -122,20 +125,20 @@ export function BarChart({ points, target, targetLabel, unit, color, goal }: Pro
               animate={{ opacity: 1, y: 0 }}
               className="rounded-xl bg-black/85 ring-1 ring-white/10 px-2.5 py-1.5 text-[11px] leading-4 whitespace-nowrap"
             >
-            <div className="text-muted">{fromKey(a.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</div>
+            <div className="text-muted">{date(fromKey(a.date), { weekday: "short", month: "short", day: "numeric" })}</div>
             {a.value === null ? (
-              <div className="text-[#e8d5d6]">Not logged</div>
+              <div className="text-[#e8d5d6]">{t("Not logged", "ما انسجل")}</div>
             ) : (
               <div className="text-[#f7ecec] font-bold">
                 {Math.round(a.value).toLocaleString("en-US")} {unit}{" "}
                 <span className="font-medium text-muted">
                   {goal === "min"
                     ? a.value >= target
-                      ? "✓ target hit"
-                      : `· ${Math.round(target - a.value)} short`
+                      ? t("✓ target hit", "✓ وصلت الهدف")
+                      : t(`· ${Math.round(target - a.value)} short`, `· ناقص ${Math.round(target - a.value)}`)
                     : a.value > target
-                      ? `▲ ${Math.round(a.value - target)} over`
-                      : `· ${Math.round(target - a.value)} under`}
+                      ? t(`▲ ${Math.round(a.value - target)} over`, `▲ ${Math.round(a.value - target)} زيادة`)
+                      : t(`· ${Math.round(target - a.value)} under`, `· أقل بـ ${Math.round(target - a.value)}`)}
                 </span>
               </div>
             )}

@@ -58,6 +58,8 @@ export function migrateSettings(stored: Partial<Settings> | null): Settings {
     nada: { ...defaultSettings.nada, ...stored.nada },
     usualMeal: { ...defaultSettings.usualMeal, ...stored.usualMeal },
     foods: stored.foods?.length ? stored.foods : defaultSettings.foods,
+    savedMeals: stored.savedMeals ?? [],
+    language: stored.language ?? "en",
     version: stored.version ?? 1,
   };
   if (merged.version < 2) {

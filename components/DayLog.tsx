@@ -2,7 +2,8 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { sumMacros } from "@/lib/engine/macros";
-import { DayEntry, EntryKind } from "@/lib/types";
+import { DayEntry, EntryKind, Payment } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
 
 const KIND_ICON: Record<EntryKind, string> = { usual: "🥣", nada: "🥛", custom: "🍽️", mcdonalds: "🍔" };
 
@@ -37,21 +38,45 @@ function RemoveButton({ label, onClick }: { label: string; onClick: () => void }
   );
 }
 
+function PaidBadge({ p, onEdit }: { p?: Payment; onEdit?: () => void }) {
+  const { t } = useI18n();
+  if (!p && !onEdit) return null;
+  return (
+    <motion.button
+      whileTap={{ scale: 0.9 }}
+      onClick={onEdit}
+      className={`text-[11px] font-bold px-2 py-1 rounded-lg ${p ? "bg-success/15 text-success" : "bg-white/5 text-muted"}`}
+    >
+      {p ? `💰 ${p.amount} ${t("AED", "د")}` : t("+ price", "+ السعر")}
+    </motion.button>
+  );
+}
+
 export function DayLog({
   entries,
+  payments = [],
   onRemoveEntry,
   onRemoveGroup,
+  onEditPayment,
 }: {
   entries: DayEntry[];
+  payments?: Payment[];
   onRemoveEntry: (id: string) => void;
   onRemoveGroup: (groupId: string) => void;
+  /** Tap the price on a McDonald's order to add or change what you paid. */
+  onEditPayment?: (groupId: string, label: string) => void;
 }) {
+  const { t } = useI18n();
+  const payFor = (g: string) => payments.find((p) => p.orderId === g);
   return (
     <motion.ul layout className="space-y-2">
       <AnimatePresence initial={false}>
         {groupEntries(entries).map((g) => {
           const single = g.entries.length === 1;
           const e = g.entries[0];
+          const isOrder = !!e.groupId && g.entries.some((x) => x.kind === "mcdonalds");
+          const pay = isOrder ? payFor(g.key) : undefined;
+          const edit = isOrder && onEditPayment ? () => onEditPayment(g.key, g.entries.map((x) => x.label).join(" + ")) : undefined;
           return (
             <motion.li
               key={g.key}
@@ -69,6 +94,7 @@ export function DayLog({
                     <div className="text-sm font-semibold truncate">{e.label}</div>
                     <div className="text-[11px] text-muted">{fmt(e.macros)}</div>
                   </div>
+                  {isOrder && <PaidBadge p={pay} onEdit={edit} />}
                   <RemoveButton label={`Remove ${e.label}`} onClick={() => onRemoveEntry(e.id)} />
                 </div>
               ) : (
@@ -76,7 +102,10 @@ export function DayLog({
                   <div className="flex items-center gap-3">
                     <span className="text-lg">🍱</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold">Meal · {g.entries.length} items</div>
+                      <div className="text-sm font-bold flex items-center gap-2">
+                        {t(`Meal · ${g.entries.length} items`, `وجبة · ${g.entries.length} أصناف`)}
+                        {isOrder && <PaidBadge p={pay} onEdit={edit} />}
+                      </div>
                       <div className="text-[11px] text-gold">{fmt(sumMacros(g.entries.map((x) => x.macros)))}</div>
                     </div>
                     <motion.button
@@ -84,10 +113,10 @@ export function DayLog({
                       onClick={() => onRemoveGroup(g.key)}
                       className="text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-red/15 text-[#ff8a7d] ring-1 ring-red/30"
                     >
-                      Delete meal
+                      {t("Delete meal", "احذف الوجبة")}
                     </motion.button>
                   </div>
-                  <ul className="mt-2 space-y-1 border-l border-white/10 ml-2.5 pl-3">
+                  <ul className="mt-2 space-y-1 border-s border-white/10 ms-2.5 ps-3">
                     <AnimatePresence initial={false}>
                       {g.entries.map((x) => (
                         <motion.li

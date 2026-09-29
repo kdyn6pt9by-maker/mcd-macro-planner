@@ -34,6 +34,25 @@ export interface Settings {
   nada: Macros & { servingMl: number; maxPerDay: number };
   usualMeal: Macros & { label: string };
   foods: FoodItem[];
+  savedMeals: SavedMeal[];
+  language: Language;
+}
+
+export type Language = "en" | "ar";
+
+export interface SavedMeal {
+  id: string;
+  name: string;
+  macros: Macros;
+}
+
+/** Money paid for one McDonald's order (the entries sharing `orderId` as groupId). */
+export interface Payment {
+  id: string;
+  orderId: string;
+  label: string;
+  amount: number;
+  at: string;
 }
 
 export type EntryKind = "usual" | "nada" | "custom" | "mcdonalds";
@@ -51,6 +70,7 @@ export interface DayEntry {
 export interface DayState {
   date: string;
   entries: DayEntry[];
+  payments?: Payment[];
 }
 
 export interface Combination {

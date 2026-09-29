@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { fromKey, WeightEntry } from "@/lib/progress";
@@ -9,6 +11,7 @@ const H = 170;
 const PAD = { top: 14, right: 10, bottom: 22, left: 34 };
 
 export function WeightChart({ data }: { data: (WeightEntry & { avg: number })[] }) {
+  const { t, date } = useI18n();
   const [active, setActive] = useState<number | null>(null);
   if (data.length === 0) return null;
 
@@ -29,10 +32,10 @@ export function WeightChart({ data }: { data: (WeightEntry & { avg: number })[] 
     <div className="relative" onPointerLeave={() => setActive(null)}>
       <div className="flex gap-4 text-[11px] text-muted mb-1">
         <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 rounded-full bg-gold" /> Trend (14-day avg)
+          <span className="h-0.5 w-4 rounded-full bg-gold" /> {t("Trend (14-day avg)", "الاتجاه (متوسط 14 يوم)")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-[#e8d5d6]" /> Weigh-in
+          <span className="h-2 w-2 rounded-full bg-[#e8d5d6]" /> {t("Weigh-in", "وزن")}
         </span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto overflow-visible" role="img" aria-label="Weight trend chart">
@@ -101,9 +104,9 @@ export function WeightChart({ data }: { data: (WeightEntry & { avg: number })[] 
               animate={{ opacity: 1, y: 0 }}
               className="rounded-xl bg-black/85 ring-1 ring-white/10 px-2.5 py-1.5 text-[11px] leading-4 whitespace-nowrap"
             >
-            <div className="text-muted">{fromKey(a.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</div>
+            <div className="text-muted">{date(fromKey(a.date), { weekday: "short", month: "short", day: "numeric" })}</div>
             <div className="text-[#f7ecec] font-bold">
-              {a.kg} kg <span className="font-medium text-muted">· trend {a.avg}</span>
+              {a.kg} kg <span className="font-medium text-muted">· {t("trend", "الاتجاه")} {a.avg}</span>
             </div>
             </motion.div>
           </div>

@@ -1,11 +1,14 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo } from "react";
 
 const COLORS = ["#ffc72c", "#ff9f1c", "#da291c", "#ffe08a", "#34d399", "#f7ecec"];
 
 export function Celebration({ streak, onDone }: { streak: number | null; onDone: () => void }) {
+  const { t } = useI18n();
   const pieces = useMemo(
     () =>
       Array.from({ length: 70 }, (_, i) => ({
@@ -57,11 +60,15 @@ export function Celebration({ streak, onDone }: { streak: number | null; onDone:
             >
               🏆
             </motion.div>
-            <div className="text-4xl font-black gold-text mt-2">{streak} weekdays!</div>
+            <div className="text-4xl font-black gold-text mt-2">{t(`${streak} weekdays!`, `${streak} أيام دوام!`)}</div>
             <p className="text-sm text-[#e8d5d6] mt-2">
-              {streak! >= 20 ? "Machine mode. Absolutely locked in." : streak! >= 10 ? "Two full weeks. This is a habit now." : "A full week on target. Keep the fire going 🔥"}
+              {streak! >= 20
+                ? t("Machine mode. Absolutely locked in.", "وضع الآلة. ملتزم مية بالمية.")
+                : streak! >= 10
+                  ? t("Two full weeks. This is a habit now.", "أسبوعين كاملين. صارت عادة.")
+                  : t("A full week on target. Keep the fire going 🔥", "أسبوع كامل على الهدف. كمّل 🔥")}
             </p>
-            <p className="text-[11px] text-muted mt-4">Tap to continue</p>
+            <p className="text-[11px] text-muted mt-4">{t("Tap to continue", "اضغط للمتابعة")}</p>
           </motion.div>
         </motion.div>
       )}

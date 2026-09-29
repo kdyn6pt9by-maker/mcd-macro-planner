@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { addMacros, roundMacros, scaleMacros, ZERO_MACROS } from "@/lib/engine/macros";
 import { FoodItem, Macros, Targets } from "@/lib/types";
 import { AnimatedNumber } from "./AnimatedNumber";
+import { DayPicker } from "./DayPicker";
+import { useI18n } from "@/lib/i18n";
+import { todayKey } from "@/lib/storage";
 
 type Sort = "protein" | "kcal" | "fat";
 
@@ -12,25 +15,32 @@ interface Props {
   open: boolean;
   onClose: () => void;
   foods: FoodItem[];
-  eaten: Macros;
+  /** What was already eaten on a given day, so the preview matches the day you log to. */
+  eatenOn: (date: string) => Macros;
   targets: Targets;
-  onAdd: (lines: { food: FoodItem; qty: number }[]) => void;
+  onAdd: (lines: { food: FoodItem; qty: number }[], date: string) => void;
 }
 
-const SORTS: { id: Sort; label: string }[] = [
-  { id: "protein", label: "💪 Protein/kcal" },
-  { id: "kcal", label: "🔥 Lowest kcal" },
-  { id: "fat", label: "🥑 Lowest fat" },
-];
-
-export function McMenuSheet({ open, onClose, foods, eaten, targets, onAdd }: Props) {
+export function McMenuSheet({ open, onClose, foods, eatenOn, targets, onAdd }: Props) {
+  const { t } = useI18n();
+  const SORTS: { id: Sort; label: string }[] = [
+    { id: "protein", label: t("💪 Protein/kcal", "💪 بروتين/سعرة") },
+    { id: "kcal", label: t("🔥 Lowest kcal", "🔥 أقل سعرات") },
+    { id: "fat", label: t("🥑 Lowest fat", "🥑 أقل دهون") },
+  ];
   const dragControls = useDragControls();
   const [qty, setQty] = useState<Record<string, number>>({});
   const [sort, setSort] = useState<Sort>("protein");
+  const [date, setDate] = useState(todayKey());
 
   useEffect(() => {
-    if (open) setQty({});
+    if (open) {
+      setQty({});
+      setDate(todayKey());
+    }
   }, [open]);
+  const eaten = useMemo(() => eatenOn(date), [eatenOn, date]);
+  const isToday = date === todayKey();
 
   const sorted = useMemo(() => {
     const list = [...foods];
@@ -81,9 +91,15 @@ export function McMenuSheet({ open, onClose, foods, eaten, targets, onAdd }: Pro
             <div className="shrink-0 px-5 pt-3 pb-3 touch-none cursor-grab" onPointerDown={(e) => dragControls.start(e)}>
               <div className="mx-auto h-1.5 w-12 rounded-full bg-white/20 mb-4" />
               <h2 className="text-xl font-black">
-                <span className="gold-text">Build</span> your McDonald&apos;s order
+                                <span className="gold-text">{t("Build", "رتّب")}</span> {t("your McDonald's order", "طلبك من ماكدونالدز")}
               </h2>
-              <p className="text-xs text-muted mt-0.5">Pick exactly what you want — see the impact before you add it.</p>
+              <p className="text-xs text-muted mt-0.5">
+                {t("Pick exactly what you want — see the impact before you add it.", "اختار اللي تبيه بالضبط — وشوف تأثيره قبل ما تضيفه.")}
+              </p>
+            </div>
+
+            <div className="shrink-0 px-5 pb-3">
+              <DayPicker value={date} onChange={setDate} />
             </div>
 
             <div className="shrink-0 px-5 flex gap-2 overflow-x-auto pb-3 no-scrollbar">
@@ -91,14 +107,11 @@ export function McMenuSheet({ open, onClose, foods, eaten, targets, onAdd }: Pro
                 <button
                   key={s.id}
                   onClick={() => setSort(s.id)}
-                  className={`relative shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                    sort === s.id ? "text-black" : "text-muted bg-white/5"
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-colors duration-200 ${
+                    sort === s.id ? "bg-gold text-black" : "text-muted bg-white/5"
                   }`}
                 >
-                  {sort === s.id && (
-                    <motion.span layoutId="menu-sort" className="absolute inset-0 rounded-full bg-gold" transition={{ type: "spring", stiffness: 500, damping: 35 }} />
-                  )}
-                  <span className="relative">{s.label}</span>
+                  {s.label}
                 </button>
               ))}
             </div>
@@ -174,16 +187,16 @@ export function McMenuSheet({ open, onClose, foods, eaten, targets, onAdd }: Pro
             >
               <div className="grid grid-cols-4 gap-1.5 text-center">
                 {[
-                  { k: "kcal", v: adds.kcal, c: "text-gold" },
-                  { k: "protein", v: adds.protein, c: "text-success" },
-                  { k: "fat", v: adds.fat, c: "text-warn" },
-                  { k: "carbs", v: adds.carbs, c: "text-carb" },
+                  { k: "kcal", l: t("kcal", "سعرة"), v: adds.kcal, c: "text-gold" },
+                  { k: "protein", l: t("protein", "بروتين"), v: adds.protein, c: "text-success" },
+                  { k: "fat", l: t("fat", "دهون"), v: adds.fat, c: "text-warn" },
+                  { k: "carbs", l: t("carbs", "كارب"), v: adds.carbs, c: "text-carb" },
                 ].map((s) => (
                   <div key={s.k} className="rounded-xl bg-white/[0.04] py-1.5">
                     <div className={`font-extrabold ${s.c}`}>
                       +<AnimatedNumber value={s.v} />
                     </div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted">{s.k}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted">{s.l}</div>
                   </div>
                 ))}
               </div>
@@ -197,7 +210,7 @@ export function McMenuSheet({ open, onClose, foods, eaten, targets, onAdd }: Pro
                     className="overflow-hidden"
                   >
                     <div className="text-xs text-muted mt-2.5 leading-5">
-                      Day after:{" "}
+                      {isToday ? t("Day after:", "يومك بعدها:") : t("That day after:", "ذاك اليوم بعدها:")}{" "}
                       <span className={kcalOver ? "text-[#ff8a7d] font-bold" : "text-[#e8d5d6]"}>
                         {after.kcal}/{targets.kcal} kcal
                       </span>{" "}
@@ -213,9 +226,17 @@ export function McMenuSheet({ open, onClose, foods, eaten, targets, onAdd }: Pro
                         animate={{ x: [6, -4, 2, 0] }}
                         className="mt-1.5 text-xs font-bold text-[#ff8a7d]"
                       >
-                        ⚠️ {fatOver ? `Over your fat limit by ${Math.round((after.fat - targets.fatMax) * 10) / 10}g` : ""}
+                        ⚠️{" "}
+                        {fatOver
+                          ? t(
+                              `Over your fat limit by ${Math.round((after.fat - targets.fatMax) * 10) / 10}g`,
+                              `فوق حد الدهون بـ ${Math.round((after.fat - targets.fatMax) * 10) / 10} جرام`
+                            )
+                          : ""}
                         {fatOver && kcalOver ? " · " : ""}
-                        {kcalOver ? `${Math.round(after.kcal - targets.kcal)} kcal over target` : ""}
+                        {kcalOver
+                          ? t(`${Math.round(after.kcal - targets.kcal)} kcal over target`, `${Math.round(after.kcal - targets.kcal)} سعرة فوق الهدف`)
+                          : ""}
                       </motion.div>
                     )}
                   </motion.div>
@@ -226,14 +247,18 @@ export function McMenuSheet({ open, onClose, foods, eaten, targets, onAdd }: Pro
                 whileTap={{ scale: 0.97 }}
                 disabled={itemCount === 0}
                 onClick={() => {
-                  onAdd(lines);
+                  onAdd(lines, date);
                   onClose();
                 }}
                 className={`mt-3 w-full rounded-2xl font-extrabold py-4 text-lg disabled:opacity-30 transition-colors ${
                   fatOver || kcalOver ? "bg-warn text-black" : "bg-gold text-black"
                 }`}
               >
-                {itemCount === 0 ? "Pick something" : `Add ${itemCount} item${itemCount > 1 ? "s" : ""} to today`}
+                {itemCount === 0
+                  ? t("Pick something", "اختار شي")
+                  : isToday
+                    ? t(`Add ${itemCount} item${itemCount > 1 ? "s" : ""} to today`, `أضف ${itemCount} ${itemCount > 1 ? "أصناف" : "صنف"} لليوم`)
+                    : t(`Add ${itemCount} item${itemCount > 1 ? "s" : ""} to that day`, `أضف ${itemCount} ${itemCount > 1 ? "أصناف" : "صنف"} لذاك اليوم`)}
               </motion.button>
             </div>
           </motion.div>

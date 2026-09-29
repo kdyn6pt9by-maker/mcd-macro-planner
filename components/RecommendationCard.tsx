@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { motion } from "framer-motion";
 import { Combination } from "@/lib/types";
 import type { HistoryEntry } from "@/lib/storage";
@@ -12,13 +14,21 @@ const LABEL_STYLES: Record<string, string> = {
   "FEWER SANDWICHES": "bg-white/10 text-[#e8d5d6] ring-1 ring-white/20",
 };
 
-export function relativeDay(iso: string): string {
+export function relativeDay(iso: string, ar = false): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days <= 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (days <= 0) return ar ? "اليوم" : "today";
+  if (days === 1) return ar ? "أمس" : "yesterday";
+  if (days < 7) return ar ? `قبل ${days} أيام` : `${days}d ago`;
+  return new Date(iso).toLocaleDateString(ar ? "ar-AE-u-nu-latn" : "en-US", { month: "short", day: "numeric" });
 }
+
+const LABEL_AR: Record<string, string> = {
+  "BEST MATCH": "الأفضل",
+  "MORE PROTEIN": "بروتين أكثر",
+  "HIGHER FAT": "دهون أعلى",
+  "LOWER CALORIES": "سعرات أقل",
+  "FEWER SANDWICHES": "سندويشات أقل",
+};
 
 interface Props {
   combo: Combination;
@@ -29,6 +39,7 @@ interface Props {
 }
 
 export function RecommendationCard({ combo, index, history, proteinTarget, onSelect }: Props) {
+  const { t, ar } = useI18n();
   const best = combo.labels.includes("BEST MATCH");
   const proteinHit = combo.afterEating.protein >= proteinTarget;
 
@@ -47,7 +58,7 @@ export function RecommendationCard({ combo, index, history, proteinTarget, onSel
         <div className="flex flex-wrap items-center gap-1.5 mb-3">
           {combo.labels.map((l) => (
             <span key={l} className={`text-[10px] font-black tracking-wider px-2 py-1 rounded-full ${LABEL_STYLES[l] ?? "bg-white/10"}`}>
-              {l}
+              {ar ? LABEL_AR[l] ?? l : l}
             </span>
           ))}
           {history && (
@@ -57,10 +68,10 @@ export function RecommendationCard({ combo, index, history, proteinTarget, onSel
               transition={{ delay: index * 0.08 + 0.25, type: "spring", stiffness: 400 }}
               className="text-[10px] font-bold px-2 py-1 rounded-full bg-violet-400/15 text-violet-300 ring-1 ring-violet-400/40"
             >
-              ↺ Chosen {history.count}× · {relativeDay(history.lastUsed)}
+              {t(`↺ Chosen ${history.count}×`, `↺ اخترته ${history.count}×`)} · {relativeDay(history.lastUsed, ar)}
             </motion.span>
           )}
-          <span className="ml-auto text-[11px] text-muted">#{index + 1}</span>
+          <span className="ms-auto text-[11px] text-muted">#{index + 1}</span>
         </div>
 
         <div className="space-y-1.5 mb-4">
@@ -89,13 +100,13 @@ export function RecommendationCard({ combo, index, history, proteinTarget, onSel
         </div>
 
         <div className="rounded-xl bg-black/30 px-3 py-2.5 text-xs text-muted leading-5 mb-3">
-          <span className="text-[#e8d5d6] font-semibold">After eating:</span> {combo.afterEating.kcal} kcal ·{" "}
+          <span className="text-[#e8d5d6] font-semibold">{t("After eating:", "بعد الأكل:")}</span> {combo.afterEating.kcal} kcal ·{" "}
           <span className={proteinHit ? "text-success font-semibold" : ""}>
             {combo.afterEating.protein}g protein{proteinHit ? " ✓" : ""}
           </span>{" "}
           · {combo.afterEating.fat}g fat · {combo.afterEating.carbs}g carbs
           <div className="text-gold font-semibold mt-0.5">
-            {combo.remainingKcal >= 0 ? `${combo.remainingKcal} kcal remaining` : `${-combo.remainingKcal} kcal over`}
+            {combo.remainingKcal >= 0 ? t(`${combo.remainingKcal} kcal remaining`, `باقي ${combo.remainingKcal} سعرة`) : t(`${-combo.remainingKcal} kcal over`, `${-combo.remainingKcal} سعرة زيادة`)}
           </div>
         </div>
 
@@ -106,7 +117,7 @@ export function RecommendationCard({ combo, index, history, proteinTarget, onSel
             best ? "bg-gold text-black" : "bg-white/[0.07] text-[#f7ecec] ring-1 ring-white/10"
           }`}
         >
-          {history ? "I'll eat this again" : "I'll eat this"}
+          {history ? t("I'll eat this again", "باكله مرة ثانية") : t("I'll eat this", "باكل هذا")}
         </motion.button>
       </div>
     </motion.div>

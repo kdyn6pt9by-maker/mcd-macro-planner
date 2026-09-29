@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
@@ -21,6 +23,7 @@ export function reloadApp() {
 }
 
 export function UpdateBanner() {
+  const { t } = useI18n();
   const [available, setAvailable] = useState(false);
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export function UpdateBanner() {
           <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}>
             ↻
           </motion.span>
-          New version ready — tap to update
+          {t("New version ready — tap to update", "في تحديث جديد — اضغط للتحديث")}
         </motion.button>
       )}
     </AnimatePresence>

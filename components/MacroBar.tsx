@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { AnimatedNumber } from "./AnimatedNumber";
 
@@ -12,6 +14,7 @@ interface Props {
 }
 
 export function MacroBar({ label, value, target, suffix, kind }: Props) {
+  const { t } = useI18n();
   const pct = target > 0 ? Math.min(100, (value / target) * 100) : 0;
   const proteinDone = kind === "protein" && value >= target;
   const fatOver = kind === "fat" && value > target;
@@ -40,7 +43,7 @@ export function MacroBar({ label, value, target, suffix, kind }: Props) {
               transition={{ type: "spring", stiffness: 500, damping: 15 }}
               className="text-[10px] font-black bg-success/20 text-success px-1.5 py-0.5 rounded-full"
             >
-              DONE ✓
+              {t("DONE ✓", "تم ✓")}
             </motion.span>
           )}
           {(fatNear || fatOver) && (
@@ -50,7 +53,7 @@ export function MacroBar({ label, value, target, suffix, kind }: Props) {
               transition={{ duration: 1.4, repeat: Infinity }}
               className={`text-[10px] font-black ${fatOver ? "text-[#ff8a7d]" : "text-warn"}`}
             >
-              {fatOver ? "OVER" : "CLOSE"}
+              {fatOver ? t("OVER", "زيادة") : t("CLOSE", "قريب")}
             </motion.span>
           )}
         </AnimatePresence>
