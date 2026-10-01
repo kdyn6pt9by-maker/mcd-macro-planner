@@ -277,3 +277,18 @@ export function loadCelebratedStreak(): number {
 export function saveCelebratedStreak(n: number) {
   safeSet(CELEBRATED_KEY, n);
 }
+
+/** After editing an order: one use moves from the old combination to the new one. */
+export function moveHistoryUse(oldKey: string, newKey: string, newLabel: string, items: OrderItem[]) {
+  if (oldKey === newKey) return;
+  const history = loadHistory();
+  const old = history.find((h) => h.key === oldKey);
+  if (old) {
+    old.count -= 1;
+    safeSet(
+      HISTORY_KEY,
+      history.filter((h) => h.count > 0)
+    );
+  }
+  recordCombinationUsed(newKey, newLabel, items);
+}

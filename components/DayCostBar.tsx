@@ -24,13 +24,21 @@ export function DayCostBar({ day, nadaPrice, link = true }: { day: DayState; nad
       style={{ background: "linear-gradient(135deg,rgba(255,199,44,0.10),rgba(52,211,153,0.06))" }}
     >
       <div className="flex items-center gap-2 text-sm flex-wrap">
-        <span className="text-muted">🍔 {t("McD", "ماك")}</span>
-        <b>{c.mcd}</b>
-        <span className="text-muted">+</span>
-        <span className="text-muted">
-          🥛 {t("Nada", "ندى")} <span className="text-[11px]">({c.nadaBottles}×{nadaPrice})</span>
-        </span>
-        <b>{c.nada}</b>
+        {(c.mcd > 0 || day.payments?.length) && (
+          <>
+            <span className="text-muted">🍔 {t("McD", "ماك")}</span>
+            <b>{c.mcd}</b>
+          </>
+        )}
+        {c.mcd > 0 && c.nadaBottles > 0 && <span className="text-muted">+</span>}
+        {c.nadaBottles > 0 && (
+          <>
+            <span className="text-muted">
+              🥛 {t("Nada", "ندى")} <span className="text-[11px]">({c.nadaBottles}×{nadaPrice})</span>
+            </span>
+            <b>{c.nada}</b>
+          </>
+        )}
         <span className="text-muted">=</span>
         <span className="ms-auto text-lg font-black gold-text">
           <AnimatedNumber value={c.total} decimals={c.total % 1 ? 1 : 0} /> {aed}

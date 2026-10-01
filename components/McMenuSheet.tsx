@@ -17,6 +17,8 @@ interface Props {
   open: boolean;
   /** Day preselected when the sheet opens (defaults to today). */
   initialDate?: string;
+  /** Editing an already-logged order: start from its items and save changes instead of adding. */
+  initialQty?: Record<string, number>;
   onClose: () => void;
   foods: FoodItem[];
   /** What was already eaten on a given day, so the preview matches the day you log to. */
@@ -25,7 +27,8 @@ interface Props {
   onAdd: (lines: { food: FoodItem; qty: number }[], date: string) => void;
 }
 
-export function McMenuSheet({ open, initialDate, onClose, foods, eatenOn, targets, onAdd }: Props) {
+export function McMenuSheet({ open, initialDate, initialQty, onClose, foods, eatenOn, targets, onAdd }: Props) {
+  const editing = !!initialQty;
   const { t } = useI18n();
   const SORTS: { id: Sort; label: string }[] = [
     { id: "protein", label: t("💪 Protein/kcal", "💪 بروتين/سعرة") },
@@ -39,11 +42,17 @@ export function McMenuSheet({ open, initialDate, onClose, foods, eatenOn, target
 
   useEffect(() => {
     if (open) {
-      setQty({});
+      setQty(initialQty ?? {});
       setDate(initialDate ?? todayKey());
     }
-  }, [open, initialDate]);
-  const eaten = useMemo(() => eatenOn(date), [eatenOn, date]);
+  }, [open, initialDate, initialQty]);
+  const eaten = useMemo(() => {
+    const base = eatenOn(date);
+    if (!initialQty) return base;
+    // The order being edited is already in the day; take it out so the preview shows the day after the change.
+    const original = foods.reduce((m, f) => addMacros(m, scaleMacros(f.macros, -(initialQty[f.id] ?? 0))), ZERO_MACROS);
+    return addMacros(base, original);
+  }, [eatenOn, date, initialQty, foods]);
   const isToday = date === todayKey();
 
   const sorted = useMemo(() => {
@@ -103,7 +112,13 @@ export function McMenuSheet({ open, initialDate, onClose, foods, eatenOn, target
             </div>
 
             <div className="shrink-0 px-5 pb-3">
-              <DayPicker value={date} onChange={setDate} />
+              {editing ? (
+                <div className="rounded-2xl bg-sky-400/10 ring-1 ring-sky-400/30 px-3.5 py-2.5 text-xs text-sky-200">
+                  ✏️ {t("Editing your order — change items and save. The price you paid stays.", "تعديل طلبك — غيّر الأصناف واحفظ. المبلغ اللي دفعته يبقى.")}
+                </div>
+              ) : (
+                <DayPicker value={date} onChange={setDate} />
+              )}
             </div>
 
             <div className="shrink-0 px-5 flex gap-2 overflow-x-auto pb-3 no-scrollbar">
@@ -258,7 +273,11 @@ export function McMenuSheet({ open, initialDate, onClose, foods, eatenOn, target
                   fatOver || kcalOver ? "bg-warn text-black" : "bg-gold text-black"
                 }`}
               >
-                {itemCount === 0
+                {editing
+                  ? itemCount === 0
+                    ? t("Pick at least one item", "اختار صنف واحد على الأقل")
+                    : t(`Save changes · ${itemCount} item${itemCount > 1 ? "s" : ""}`, `احفظ التعديل · ${itemCount} ${itemCount > 1 ? "أصناف" : "صنف"}`)
+                  : itemCount === 0
                   ? t("Pick something", "اختار شي")
                   : isToday
                     ? t(`Add ${itemCount} item${itemCount > 1 ? "s" : ""} to today`, `أضف ${itemCount} ${itemCount > 1 ? "أصناف" : "صنف"} لليوم`)

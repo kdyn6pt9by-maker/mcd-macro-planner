@@ -20,6 +20,7 @@ import { roundMacros, scaleMacros, sumMacros } from "@/lib/engine/macros";
 import { combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
 import { useI18n } from "@/lib/i18n";
 import { cloneEntries, costSummary, prunePayments, recentAmounts } from "@/lib/insights";
+import { editOrder, orderQty } from "@/lib/logging";
 import { STREAK_MILESTONE, fromKey, pendingWeekendDays, toKey, weekdayStreak } from "@/lib/progress";
 import {
   historyFor,
@@ -65,6 +66,7 @@ export default function HomePage() {
   const [showResults, setShowResults] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState<{ date: string; groupId: string; qty: Record<string, number> } | null>(null);
   const [pay, setPay] = useState<PayRequest | null>(null);
   const [weekendDates, setWeekendDates] = useState<string[]>([]);
   const [celebrate, setCelebrate] = useState<number | null>(null);
@@ -790,6 +792,7 @@ export default function HomePage() {
               payments={day.payments}
               onRemoveEntry={removeEntry}
               onRemoveGroup={removeGroup}
+              onEditOrder={(groupId) => setEditing({ date: day.date, groupId, qty: orderQty(day, groupId, settings.foods) })}
               onEditPayment={(orderId, label) => {
                 const items = day.entries.filter((e) => e.groupId === orderId && e.kind === "mcdonalds");
                 setPay({
@@ -822,6 +825,26 @@ export default function HomePage() {
             lines.map((l) => ({ id: l.food.id, name: l.food.name, qty: l.qty, macros: l.food.macros }))
           )
         }
+      />
+      <McMenuSheet
+        open={!!editing}
+        initialDate={editing?.date}
+        initialQty={editing?.qty}
+        onClose={() => setEditing(null)}
+        foods={settings.foods.filter((f) => f.enabled && f.verified)}
+        eatenOn={eatenOn}
+        targets={targets}
+        onAdd={(lines) => {
+          if (!editing) return;
+          const res = editOrder(editing.date, editing.groupId, lines, settings.foods, uid);
+          if (editing.date === todayKey()) setDay(res.after);
+          setFavorites(topFavorites());
+          showToast(t("✏️ Order updated", "✏️ انعدّل الطلب"), () => {
+            res.undo();
+            setDay(loadDay());
+            setFavorites(topFavorites());
+          });
+        }}
       />
       <AddFoodSheet
         open={sheetOpen}

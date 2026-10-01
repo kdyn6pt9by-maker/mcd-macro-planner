@@ -60,3 +60,70 @@ describe("logging to past days", () => {
     expect(day.entries[0].macros.kcal).toBe(2100);
   });
 });
+
+describe("editing a logged order", () => {
+  const cheese = { kcal: 295, protein: 13, fat: 13, carbs: 32 };
+  it("swaps the burger in place and keeps the payment and Nada", async () => {
+    const { appendToDay, setPayment, replaceOrderItems } = await import("./logging");
+    const { loadDay } = await import("./storage");
+    appendToDay("2026-09-30", [{ kind: "usual", label: "Usual", macros }], false, id);
+    const { groupId } = appendToDay(
+      "2026-09-30",
+      [
+        { kind: "mcdonalds", label: "Beef Burger", macros },
+        { kind: "nada", label: "Nada Protein Milk", macros },
+      ],
+      true,
+      id
+    );
+    setPayment("2026-09-30", groupId!, "1 × Beef Burger", 12, id, { esaad: true });
+    replaceOrderItems("2026-09-30", groupId!, [{ kind: "mcdonalds", label: "Cheeseburger", macros: cheese }], "1 × Cheeseburger", id);
+    const day = loadDay("2026-09-30");
+    expect(day.entries.map((e) => e.label)).toEqual(["Usual", "Cheeseburger", "Nada Protein Milk"]);
+    expect(day.entries[1].groupId).toBe(groupId);
+    expect(day.payments).toHaveLength(1);
+    expect(day.payments![0]).toMatchObject({ amount: 12, esaad: true, label: "1 × Cheeseburger" });
+  });
+
+  it("builds stats keys from logged entries and moves one use between combos", async () => {
+    const { orderKeyFromEntries } = await import("./logging");
+    const { recordCombinationUsed, moveHistoryUse, loadHistory } = await import("./storage");
+    const foods = [{ id: "beef-burger", name: "Beef Burger" }];
+    const key = orderKeyFromEntries(
+      [
+        { id: "1", kind: "mcdonalds", label: "Beef Burger", macros, at: "" },
+        { id: "2", kind: "mcdonalds", label: "Beef Burger", macros, at: "" },
+        { id: "3", kind: "nada", label: "Nada", macros, at: "" },
+      ],
+      foods
+    );
+    expect(key).toBe("beef-burgerx2|nadax1");
+    recordCombinationUsed(key, "2 × Beef Burger + Nada");
+    moveHistoryUse(key, "cheeseburgerx1", "1 × Cheeseburger", []);
+    expect(loadHistory().map((h) => [h.key, h.count])).toEqual([["cheeseburgerx1", 1]]);
+  });
+});
+
+describe("editOrder", () => {
+  it("swaps items, keeps payment, moves stats, and can be undone", async () => {
+    const { appendToDay, setPayment, editOrder, orderQty } = await import("./logging");
+    const { loadDay, recordCombinationUsed, loadHistory } = await import("./storage");
+    const foods = [
+      { id: "beef-burger", name: "Beef Burger", macros },
+      { id: "cheeseburger", name: "Cheeseburger", macros: { kcal: 295, protein: 13, fat: 13, carbs: 32 } },
+    ];
+    const { groupId } = appendToDay("2026-10-01", [{ kind: "mcdonalds", label: "Beef Burger", macros }], true, id);
+    setPayment("2026-10-01", groupId!, "1 × Beef Burger", 10, id, { esaad: true });
+    recordCombinationUsed("beef-burgerx1", "1 × Beef Burger");
+    expect(orderQty(loadDay("2026-10-01"), groupId!, foods)).toEqual({ "beef-burger": 1 });
+
+    const res = editOrder("2026-10-01", groupId!, [{ food: foods[1], qty: 2 }], foods, id);
+    expect(res.after.entries.map((e) => e.label)).toEqual(["Cheeseburger", "Cheeseburger"]);
+    expect(res.after.payments![0].amount).toBe(10);
+    expect(loadHistory().map((h) => [h.key, h.count])).toEqual([["cheeseburgerx2", 1]]);
+
+    res.undo();
+    expect(loadDay("2026-10-01").entries.map((e) => e.label)).toEqual(["Beef Burger"]);
+    expect(loadHistory().map((h) => [h.key, h.count])).toEqual([["beef-burgerx1", 1]]);
+  });
+});

@@ -27,6 +27,19 @@ function groupEntries(entries: DayEntry[]): Group[] {
   return groups;
 }
 
+function EditButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.85 }}
+      onClick={onClick}
+      aria-label={label}
+      className="h-8 w-8 shrink-0 rounded-full bg-sky-400/10 text-sky-300 flex items-center justify-center ring-1 ring-sky-400/25"
+    >
+      ✏️
+    </motion.button>
+  );
+}
+
 function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <motion.button
@@ -62,6 +75,7 @@ export function DayLog({
   onRemoveEntry,
   onRemoveGroup,
   onEditPayment,
+  onEditOrder,
 }: {
   entries: DayEntry[];
   payments?: Payment[];
@@ -69,6 +83,8 @@ export function DayLog({
   onRemoveGroup: (groupId: string) => void;
   /** Tap the price on a McDonald's order to add or change what you paid. */
   onEditPayment?: (groupId: string, label: string) => void;
+  /** Change the items of a logged McDonald's order (e.g. ordered a different burger). */
+  onEditOrder?: (groupId: string) => void;
 }) {
   const { t } = useI18n();
   const payFor = (g: string) => payments.find((p) => p.orderId === g);
@@ -80,6 +96,7 @@ export function DayLog({
           const e = g.entries[0];
           const isOrder = !!e.groupId && g.entries.some((x) => x.kind === "mcdonalds");
           const pay = isOrder ? payFor(g.key) : undefined;
+          const editItems = isOrder && onEditOrder ? () => onEditOrder(g.key) : undefined;
           const edit = isOrder && onEditPayment ? () => onEditPayment(g.key, g.entries.map((x) => x.label).join(" + ")) : undefined;
           return (
             <motion.li
@@ -99,6 +116,7 @@ export function DayLog({
                     <div className="text-[11px] text-muted">{fmt(e.macros)}</div>
                   </div>
                   {isOrder && <PaidBadge p={pay} onEdit={edit} />}
+                  {editItems && <EditButton label={t(`Edit ${e.label}`, `عدّل ${e.label}`)} onClick={editItems} />}
                   <RemoveButton label={`Remove ${e.label}`} onClick={() => onRemoveEntry(e.id)} />
                 </div>
               ) : (
@@ -112,6 +130,7 @@ export function DayLog({
                       </div>
                       <div className="text-[11px] text-gold">{fmt(sumMacros(g.entries.map((x) => x.macros)))}</div>
                     </div>
+                    {editItems && <EditButton label={t("Edit meal", "عدّل الوجبة")} onClick={editItems} />}
                     <motion.button
                       whileTap={{ scale: 0.9 }}
                       onClick={() => onRemoveGroup(g.key)}

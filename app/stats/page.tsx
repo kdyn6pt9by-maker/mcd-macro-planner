@@ -28,7 +28,7 @@ import {
 import { DayState, FoodItem, Macros, Settings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { hasEsaad, prunePayments, recentAmounts } from "@/lib/insights";
-import { appendToDay, setDayTotals, setPayment, type NewEntry } from "@/lib/logging";
+import { appendToDay, editOrder, orderQty, setDayTotals, setPayment, type NewEntry } from "@/lib/logging";
 import { AddFoodSheet } from "@/components/AddFoodSheet";
 import { McMenuSheet } from "@/components/McMenuSheet";
 import { PayRequest, PaySheet } from "@/components/PaySheet";
@@ -87,6 +87,7 @@ export default function StatsPage() {
   });
   const [sheet, setSheet] = useState<"food" | "menu" | null>(null);
   const [pay, setPay] = useState<PayRequest | null>(null);
+  const [editing, setEditing] = useState<{ date: string; groupId: string; qty: Record<string, number> } | null>(null);
   const eatenOn = useCallback((date: string) => sumMacros(listDays().find((d) => d.date === date)?.entries.map((e) => e.macros) ?? []), []);
 
   const refresh = () => {
@@ -528,6 +529,7 @@ export default function StatsPage() {
                             <DayLog
                               entries={d.entries}
                               payments={d.payments}
+                              onEditOrder={(groupId) => setEditing({ date: d.date, groupId, qty: orderQty(d, groupId, settings.foods) })}
                               onEditPayment={(orderId, label) => {
                                 const es = d.entries.filter((e) => e.groupId === orderId && e.kind === "mcdonalds");
                                 setPay({
@@ -594,6 +596,24 @@ export default function StatsPage() {
         eatenOn={eatenOn}
         targets={settings.targets.workday}
         onAdd={addOrder}
+      />
+      <McMenuSheet
+        open={!!editing}
+        initialDate={editing?.date}
+        initialQty={editing?.qty}
+        onClose={() => setEditing(null)}
+        foods={settings.foods.filter((f) => f.enabled && f.verified)}
+        eatenOn={eatenOn}
+        targets={settings.targets.workday}
+        onAdd={(lines) => {
+          if (!editing) return;
+          const res = editOrder(editing.date, editing.groupId, lines, settings.foods, uid);
+          refresh();
+          showToast(t("✏️ Order updated", "✏️ انعدّل الطلب"), () => {
+            res.undo();
+            refresh();
+          });
+        }}
       />
       <PaySheet
         request={pay}
