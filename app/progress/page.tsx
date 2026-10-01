@@ -1,5 +1,6 @@
 "use client";
 
+import { effectiveTargets, pctForCalories } from "@/lib/goals";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -69,7 +70,7 @@ export default function ProgressPage() {
     setWeights(loadWeights());
   }, []);
 
-  const targets = settings?.targets.workday;
+  const targets = settings ? effectiveTargets(settings, "workday") : undefined;
   const points = useMemo(() => (days && targets ? dailySeries(days, range, targets) : []), [days, targets, range]);
   const weekPoints = useMemo(() => (days && targets ? dailySeries(days, 7, targets) : []), [days, targets]);
 
@@ -122,7 +123,12 @@ export default function ProgressPage() {
   }
 
   function applyTarget(kcal: number) {
-    const next = { ...settings!, targets: { ...settings!.targets, workday: { ...settings!.targets.workday, kcal } } };
+    // The estimate is your real maintenance: store it as the base, and express the weekly goal as cut/bulk %.
+    const next = {
+      ...settings!,
+      targets: { ...settings!.targets, workday: { ...settings!.targets.workday, kcal: maint!.maintenance } },
+      goal: pctForCalories(maint!.maintenance, kcal),
+    };
     saveSettings(next);
     setSettings(next);
     say(t(`Workday target set to ${kcal.toLocaleString("en-US")} kcal ✓`, `هدف يوم الدوام صار ${kcal.toLocaleString("en-US")} سعرة ✓`));

@@ -1,5 +1,6 @@
 "use client";
 
+import { effectiveTargets } from "@/lib/goals";
 import { foodEmoji } from "@/lib/foodEmoji";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -33,7 +34,7 @@ export default function QuickPage() {
 
   const top = useMemo(() => {
     if (!settings || !day) return [];
-    const targets = settings.targets[loadMode()];
+    const targets = effectiveTargets(settings, loadMode());
     const nada: FoodItem = {
       id: "nada",
       name: "Nada Protein Milk",

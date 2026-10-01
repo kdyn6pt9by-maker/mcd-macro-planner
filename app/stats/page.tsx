@@ -1,5 +1,6 @@
 "use client";
 
+import { effectiveTargets } from "@/lib/goals";
 import { foodEmoji } from "@/lib/foodEmoji";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -8,6 +9,7 @@ import { useEffect, useState } from "react";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { DayLog } from "@/components/DayLog";
 import { DayCostBar } from "@/components/DayCostBar";
+import { BarcodeSheet } from "@/components/BarcodeSheet";
 import { relativeDay } from "@/components/RecommendationCard";
 import { Toast, ToastData } from "@/components/Toast";
 import { roundMacros, scaleMacros, sumMacros } from "@/lib/engine/macros";
@@ -85,7 +87,7 @@ export default function StatsPage() {
     d.setDate(d.getDate() - 1);
     return toKey(d);
   });
-  const [sheet, setSheet] = useState<"food" | "menu" | null>(null);
+  const [sheet, setSheet] = useState<"food" | "menu" | "scan" | null>(null);
   const [pay, setPay] = useState<PayRequest | null>(null);
   const [editing, setEditing] = useState<{ date: string; groupId: string; qty: Record<string, number> } | null>(null);
   const eatenOn = useCallback((date: string) => sumMacros(listDays().find((d) => d.date === date)?.entries.map((e) => e.macros) ?? []), []);
@@ -238,7 +240,7 @@ export default function StatsPage() {
     );
   }
 
-  function openLog(date: string, kind: "food" | "menu") {
+  function openLog(date: string, kind: "food" | "menu" | "scan") {
     setLogDate(date);
     setSheet(kind);
   }
@@ -334,6 +336,13 @@ export default function StatsPage() {
               {t("🍟 McDonald's", "🍟 ماكدونالدز")}
             </motion.button>
           </div>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => openLog(logDate, "scan")}
+            className="mt-2 w-full rounded-2xl bg-black/30 ring-1 ring-white/10 py-2.5 text-sm font-bold"
+          >
+            📷 {t("Scan a barcode", "امسح باركود")}
+          </motion.button>
           <QuickRow date={logDate} />
         </motion.div>
       )}
@@ -464,7 +473,7 @@ export default function StatsPage() {
             {days.map((d, i) => {
               const isOpen = open === d.date;
               const total = sumMacros(d.entries.map((e) => e.macros));
-              const target = settings.targets.workday;
+              const target = effectiveTargets(settings, "workday");
               return (
                 <motion.div
                   key={d.date}
@@ -588,13 +597,19 @@ export default function StatsPage() {
         onAdd={addFood}
         onSetTotals={setTotals}
       />
+      <BarcodeSheet
+        open={sheet === "scan"}
+        initialDate={logDate}
+        onClose={() => setSheet(null)}
+        onAdd={(label, macros, date) => addFood(label, macros, date, false)}
+      />
       <McMenuSheet
         open={sheet === "menu"}
         initialDate={logDate}
         onClose={() => setSheet(null)}
         foods={settings.foods.filter((f) => f.enabled && f.verified)}
         eatenOn={eatenOn}
-        targets={settings.targets.workday}
+        targets={effectiveTargets(settings, "workday")}
         onAdd={addOrder}
       />
       <McMenuSheet
@@ -604,7 +619,7 @@ export default function StatsPage() {
         onClose={() => setEditing(null)}
         foods={settings.foods.filter((f) => f.enabled && f.verified)}
         eatenOn={eatenOn}
-        targets={settings.targets.workday}
+        targets={effectiveTargets(settings, "workday")}
         onAdd={(lines) => {
           if (!editing) return;
           const res = editOrder(editing.date, editing.groupId, lines, settings.foods, uid);

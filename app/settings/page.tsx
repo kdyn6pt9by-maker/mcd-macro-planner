@@ -6,6 +6,7 @@ import { clearHistory, exportBackup, importBackup, listDays, loadSettings, reque
 import { kcalFromMacros } from "@/lib/engine/macros";
 import { DayMode, FoodItem, Settings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
+import { GoalSection } from "@/components/GoalSection";
 import { motion, AnimatePresence } from "framer-motion";
 
 function NumberField({
@@ -210,6 +211,8 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      <GoalSection settings={settings} onChange={(goal) => update({ ...settings, goal })} />
+
       <section className="rounded-xl3 glass p-4 mb-4">
         <h2 className="font-semibold mb-1">⭐ {t("Saved quick meals", "الوجبات السريعة المحفوظة")}</h2>
         {settings.savedMeals.length === 0 ? (
@@ -251,7 +254,7 @@ export default function SettingsPage() {
 
       {modes.map((m) => (
         <section key={m} className="rounded-xl3 glass p-4 mb-4">
-          <h2 className="font-semibold mb-2">{m === "workday" ? t("💼 Workday targets", "💼 أهداف يوم الدوام") : t("🌴 Weekend targets", "🌴 أهداف الويكند")}</h2>
+          <h2 className="font-semibold mb-2">{m === "workday" ? t("💼 Workday maintenance targets", "💼 أهداف الثبات · يوم الدوام") : t("🌴 Weekend maintenance targets", "🌴 أهداف الثبات · الويكند")}</h2>
           <NumberField
             label={t("Calories", "السعرات")}
             value={settings.targets[m].kcal}

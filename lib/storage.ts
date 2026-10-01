@@ -60,6 +60,7 @@ export function migrateSettings(stored: Partial<Settings> | null): Settings {
     foods: stored.foods?.length ? stored.foods : defaultSettings.foods,
     savedMeals: stored.savedMeals ?? [],
     language: stored.language ?? "en",
+    goal: stored.goal ?? defaultSettings.goal,
     version: stored.version ?? 1,
   };
   if (merged.version < 2) {
@@ -202,7 +203,7 @@ interface Backup {
 
 export function exportBackup(): Backup {
   const data: Record<string, unknown> = {};
-  for (const key of [SETTINGS_KEY, DAYS_KEY, MODE_KEY, HISTORY_KEY, WEIGHTS_KEY, WEEKEND_SKIP_KEY, CELEBRATED_KEY]) data[key] = safeGet<unknown>(key, null);
+  for (const key of [SETTINGS_KEY, DAYS_KEY, MODE_KEY, HISTORY_KEY, WEIGHTS_KEY, WEEKEND_SKIP_KEY, CELEBRATED_KEY, "mcd-planner:barcodes"]) data[key] = safeGet<unknown>(key, null);
   return { format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), data };
 }
 
@@ -291,4 +292,15 @@ export function moveHistoryUse(oldKey: string, newKey: string, newLabel: string,
     );
   }
   recordCombinationUsed(newKey, newLabel, items);
+}
+
+const BARCODES_KEY = "mcd-planner:barcodes";
+
+/** Products you've scanned (or typed in), so the next scan is instant and works offline. */
+export function loadBarcodeCache(): Record<string, import("./barcode").ScannedProduct> {
+  return safeGet(BARCODES_KEY, {});
+}
+
+export function saveBarcodeProduct(p: import("./barcode").ScannedProduct) {
+  safeSet(BARCODES_KEY, { ...loadBarcodeCache(), [p.code]: p });
 }

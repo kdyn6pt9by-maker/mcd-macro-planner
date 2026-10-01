@@ -1,5 +1,7 @@
 "use client";
 
+import { effectiveTargets, weekBank } from "@/lib/goals";
+import { BankCard } from "@/components/BankCard";
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,6 +10,7 @@ import { CalorieRing } from "@/components/CalorieRing";
 import { Celebration } from "@/components/Celebration";
 import { DayLog } from "@/components/DayLog";
 import { DayCostBar } from "@/components/DayCostBar";
+import { BarcodeSheet } from "@/components/BarcodeSheet";
 import { MacroBar } from "@/components/MacroBar";
 import { McMenuSheet } from "@/components/McMenuSheet";
 import { PayFlags, PayRequest, PaySheet } from "@/components/PaySheet";
@@ -66,6 +69,7 @@ export default function HomePage() {
   const [showResults, setShowResults] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const [editing, setEditing] = useState<{ date: string; groupId: string; qty: Record<string, number> } | null>(null);
   const [pay, setPay] = useState<PayRequest | null>(null);
   const [weekendDates, setWeekendDates] = useState<string[]>([]);
@@ -115,7 +119,7 @@ export default function HomePage() {
   // Streak uses workday targets (it only counts Mon–Fri). Celebrate each new multiple of 5 once.
   useEffect(() => {
     if (!settings || !day) return;
-    const s = weekdayStreak(loadAllDays(), settings.targets.workday);
+    const s = weekdayStreak(loadAllDays(), effectiveTargets(settings, "workday"));
     setStreak(s);
     const celebrated = loadCelebratedStreak();
     if (s < celebrated) saveCelebratedStreak(s - (s % STREAK_MILESTONE));
@@ -125,7 +129,29 @@ export default function HomePage() {
     }
   }, [settings, day]);
 
-  const targets = settings?.targets[mode];
+  const bank = useMemo(() => (settings && day ? weekBank(loadAllDays(), settings) : null), [settings, day]);
+  const [bankDate, setBankDate] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setBankDate(window.localStorage.getItem("mcd-planner:bank-use"));
+    } catch {}
+  }, []);
+  const isWeekendToday = [0, 6].includes(new Date().getDay());
+  const usingBank = isWeekendToday && bankDate === todayKey() && !!bank && bank.perWeekendDay > 0;
+  const toggleBank = (on: boolean) => {
+    const v = on ? todayKey() : null;
+    setBankDate(v);
+    try {
+      if (v) window.localStorage.setItem("mcd-planner:bank-use", v);
+      else window.localStorage.removeItem("mcd-planner:bank-use");
+    } catch {}
+  };
+  const baseTargets = settings ? effectiveTargets(settings, mode) : undefined;
+  // Spending the bank adds the weekend share on top; the extra room goes to carbs (protein and fat limits stay).
+  const targets =
+    baseTargets && usingBank
+      ? { ...baseTargets, kcal: baseTargets.kcal + bank!.perWeekendDay, carbsRef: baseTargets.carbsRef + Math.round(bank!.perWeekendDay / 4) }
+      : baseTargets;
   const eaten = useMemo(() => sumMacros(day?.entries.map((e) => e.macros) ?? []), [day]);
   const nadaCount = day?.entries.filter((e) => e.kind === "nada").length ?? 0;
   const usualAdded = day?.entries.some((e) => e.kind === "usual") ?? false;
@@ -352,6 +378,17 @@ export default function HomePage() {
                 💰 {weekSpend} {t("AED · 7d", "درهم · 7 أيام")}
               </motion.span>
             </Link>
+            {settings.goal.mode !== "maintain" && (
+              <Link href="/settings" className="ms-1.5">
+                <span
+                  className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ring-1 ${
+                    settings.goal.mode === "cut" ? "bg-sky-400/10 text-sky-300 ring-sky-400/25" : "bg-emerald-400/10 text-emerald-300 ring-emerald-400/25"
+                  }`}
+                >
+                  {settings.goal.mode === "cut" ? `✂️ ${t("Cut", "تنشيف")} −${settings.goal.pct}%` : `💪 ${t("Bulk", "تضخيم")} +${settings.goal.pct}%`}
+                </span>
+              </Link>
+            )}
           </div>
           <div className="flex gap-1.5 shrink-0">
             <motion.button
@@ -424,6 +461,8 @@ export default function HomePage() {
             </motion.div>
           ))}
         </motion.div>
+
+        {bank && <BankCard bank={bank} isWeekend={isWeekendToday} using={usingBank} onToggle={toggleBank} />}
 
         {/* Evening nudge: weekday after 7pm with protein still short */}
         {(() => {
@@ -595,6 +634,21 @@ export default function HomePage() {
             <span className="block font-bold">{t("Ate something else?", "أكلت شي ثاني؟")}</span>
             <span className="block text-[11px] text-muted">
               {t("Protein · carbs · fat — calories auto. Any day.", "بروتين · كارب · دهون — السعرات تلقائي. لأي يوم.")}
+            </span>
+          </span>
+          <span className="text-muted rtl:rotate-180">›</span>
+        </motion.button>
+
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setScanOpen(true)}
+          className="mt-2.5 w-full glass rounded-2xl p-4 flex items-center gap-3 text-start"
+        >
+          <span className="h-10 w-10 rounded-xl bg-white/10 text-xl flex items-center justify-center">📷</span>
+          <span className="flex-1">
+            <span className="block font-bold">{t("Scan a barcode", "امسح باركود")}</span>
+            <span className="block text-[11px] text-muted">
+              {t("Protein bar, yogurt, anything packaged — macros fill in", "بروتين بار، زبادي، أي منتج — الماكروز تتعبى لحالها")}
             </span>
           </span>
           <span className="text-muted rtl:rotate-180">›</span>
@@ -845,6 +899,11 @@ export default function HomePage() {
             setFavorites(topFavorites());
           });
         }}
+      />
+      <BarcodeSheet
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onAdd={(label, macros, date) => addEntries(date, [{ kind: "custom", label, macros }], `${label} · +${Math.round(macros.kcal)} kcal`)}
       />
       <AddFoodSheet
         open={sheetOpen}

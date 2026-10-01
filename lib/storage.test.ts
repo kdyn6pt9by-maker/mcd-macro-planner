@@ -25,7 +25,8 @@ describe("settings migration", () => {
     const v1 = { ...defaultSettings, version: undefined, nada: { ...defaultSettings.nada, maxPerDay: 3 } };
     const migrated = migrateSettings(v1 as never);
     expect(migrated.nada.maxPerDay).toBe(4);
-    expect(migrated.version).toBe(3);
+    expect(migrated.version).toBe(4);
+    expect(migrated.goal).toEqual({ mode: "maintain", pct: 20 });
     expect(migrated.savedMeals).toEqual([]);
     expect(migrated.language).toBe("en");
   });

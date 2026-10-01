@@ -36,6 +36,8 @@ export interface Settings {
   foods: FoodItem[];
   savedMeals: SavedMeal[];
   language: Language;
+  /** Maintain / cut / bulk on top of the targets above (which are your maintenance numbers). */
+  goal: { mode: "maintain" | "cut" | "bulk"; pct: number };
 }
 
 export type Language = "en" | "ar";

@@ -137,7 +137,7 @@ export const defaultMcDonaldsFoods: FoodItem[] = [
   ),
 ];
 
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 
 export const defaultSettings: Settings = {
   version: SETTINGS_VERSION,
@@ -164,4 +164,5 @@ export const defaultSettings: Settings = {
   foods: defaultMcDonaldsFoods,
   savedMeals: [],
   language: "en",
+  goal: { mode: "maintain", pct: 20 },
 };
