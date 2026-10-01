@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultSettings } from "./data/defaultSettings";
-import { applyGoal, pctForCalories, weekBank } from "./goals";
+import { applyGoal, bankBonusFor, pctForCalories, weekBank } from "./goals";
 import { fromKey } from "./progress";
 import { DayState, Settings, Targets } from "./types";
 
@@ -42,37 +42,53 @@ describe("applyGoal", () => {
   });
 });
 
-describe("weekBank", () => {
+describe("weekBank (Mon–Thu save → Fri/Sat/Sun spend)", () => {
   const settings: Settings = { ...defaultSettings, goal: { mode: "maintain", pct: 0 } };
   const day = (date: string, kcal: number): DayState => ({
     date,
     entries: [{ id: date, kind: "custom", label: "x", macros: { kcal, protein: 0, fat: 0, carbs: 0 }, at: "" }],
   });
-  // Week of Mon 2026-09-28 … Sun 2026-10-04
+  // Week of Mon 2026-09-28 … Sun 2026-10-04; Wednesday not logged.
   const days = {
-    "2026-09-28": day("2026-09-28", 1800),
-    "2026-09-29": day("2026-09-29", 1700),
-    "2026-09-30": day("2026-09-30", 2100),
+    "2026-09-28": day("2026-09-28", 1700),
+    "2026-09-29": day("2026-09-29", 1800),
+    "2026-10-01": day("2026-10-01", 1900),
+    "2026-10-02": day("2026-10-02", 2500), // Friday: never counted as saving
   };
 
-  it("adds up savings on logged days before today and spreads them over the weekend", () => {
-    const b = weekBank(days, settings, fromKey("2026-10-01")); // Thursday
-    expect(b.saved).toBe(200 + 300 - 100);
+  it("counts only logged Mon–Thu days and splits the total over Fri, Sat, Sun", () => {
+    const b = weekBank(days, settings, fromKey("2026-10-02"));
+    expect(b.saveDays.map((d) => d.diff)).toEqual([300, 200, null, 100]);
+    expect(b.saved).toBe(600);
     expect(b.loggedDays).toBe(3);
-    expect(b.weekendDaysLeft).toBe(2);
-    expect(b.perWeekendDay).toBe(200);
-    expect(b.weeklyBudget).toBe(14000);
+    expect(b.perDay).toBe(200);
+    expect(b.spendDays.map((d) => [d.date, d.target + d.bonus])).toEqual([
+      ["2026-10-02", 2200],
+      ["2026-10-03", 2200],
+      ["2026-10-04", 2200],
+    ]);
   });
 
-  it("on Sunday the whole bank goes to today", () => {
-    const b = weekBank(days, settings, fromKey("2026-10-04"));
-    expect(b.weekendDaysLeft).toBe(1);
-    expect(b.perWeekendDay).toBe(b.saved);
+  it("is the same whichever day of the week you look", () => {
+    expect(weekBank(days, settings, fromKey("2026-09-28")).saveDays[0].diff).toBe(300);
+    expect(weekBank(days, settings, fromKey("2026-10-04")).perDay).toBe(200);
+  });
+
+  it("gives no bonus when you went over", () => {
+    const over = { "2026-09-28": day("2026-09-28", 2600) };
+    const b = weekBank(over, settings, fromKey("2026-10-03"));
+    expect(b.saved).toBe(-600);
+    expect(b.perDay).toBe(0);
   });
 
   it("follows the active goal's targets", () => {
     const cut = { ...settings, goal: { mode: "cut" as const, pct: 10 } };
-    const b = weekBank(days, cut, fromKey("2026-10-01"));
-    expect(b.saved).toBe(1800 * 3 - (1800 + 1700 + 2100));
+    expect(weekBank(days, cut, fromKey("2026-10-02")).saved).toBe(1800 * 3 - (1700 + 1800 + 1900));
+  });
+
+  it("bonus only on Fri–Sun", () => {
+    expect(bankBonusFor("2026-10-01", days, settings)).toBe(0);
+    expect(bankBonusFor("2026-10-02", days, settings)).toBe(200);
+    expect(bankBonusFor("2026-10-04", days, settings)).toBe(200);
   });
 });

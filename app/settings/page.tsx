@@ -401,6 +401,9 @@ export default function SettingsPage() {
           {t("Clear favorites / history", "امسح المفضلة / السجل")}
         </button>
       </section>
+      <footer className="text-center text-[12px] text-muted/80 mt-8 font-bold">
+        {t("Made by", "صُنع بواسطة")} <span className="gold-text">Mohammad Almansoori</span>
+      </footer>
     </main>
   );
 }

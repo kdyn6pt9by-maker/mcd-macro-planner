@@ -48,14 +48,24 @@ export function dailySeries(days: Record<string, DayState>, count: number, targe
  * Consecutive committed weekdays (Mon–Fri) ending at today. Weekends are skipped, never break it.
  * Today only adds once it's committed — an unfinished today doesn't break the streak either.
  */
-export function weekdayStreak(days: Record<string, DayState>, targets: Targets, today = new Date()): number {
+export function weekdayStreak(
+  days: Record<string, DayState>,
+  targets: Targets,
+  today = new Date(),
+  /** Extra kcal allowed on a date (e.g. Friday's calorie-bank share), so spending the bank never breaks the streak. */
+  bonusFor: (date: string) => number = () => 0
+): number {
+  const ok = (d: Date) => {
+    const key = toKey(d);
+    return isCommitted(dayTotals(days[key]), { ...targets, kcal: targets.kcal + bonusFor(key) });
+  };
   let streak = 0;
   let cursor = new Date(today);
-  if (isWeekday(cursor) && isCommitted(dayTotals(days[toKey(cursor)]), targets)) streak++;
+  if (isWeekday(cursor) && ok(cursor)) streak++;
   cursor = addDays(cursor, -1);
   for (let guard = 0; guard < 3660; guard++, cursor = addDays(cursor, -1)) {
     if (!isWeekday(cursor)) continue;
-    if (!isCommitted(dayTotals(days[toKey(cursor)]), targets)) break;
+    if (!ok(cursor)) break;
     streak++;
   }
   return streak;

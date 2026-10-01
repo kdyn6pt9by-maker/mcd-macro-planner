@@ -8,7 +8,7 @@ const config: Config = {
         sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Inter", "Segoe UI", "Roboto", "sans-serif"],
       },
       colors: {
-        base: "#0b0405",
+        ink: "#0b0405",
         card: "#1a0a0c",
         cardBorder: "#3a1418",
         gold: "#ffc72c",

@@ -1,6 +1,6 @@
 "use client";
 
-import { effectiveTargets, weekBank } from "@/lib/goals";
+import { bankBonusFor, effectiveTargets, weekBank } from "@/lib/goals";
 import { BankCard } from "@/components/BankCard";
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "framer-motion";
 import Link from "next/link";
@@ -119,7 +119,8 @@ export default function HomePage() {
   // Streak uses workday targets (it only counts Mon–Fri). Celebrate each new multiple of 5 once.
   useEffect(() => {
     if (!settings || !day) return;
-    const s = weekdayStreak(loadAllDays(), effectiveTargets(settings, "workday"));
+    const all = loadAllDays();
+    const s = weekdayStreak(all, effectiveTargets(settings, "workday"), new Date(), (d) => bankBonusFor(d, all, settings));
     setStreak(s);
     const celebrated = loadCelebratedStreak();
     if (s < celebrated) saveCelebratedStreak(s - (s % STREAK_MILESTONE));
@@ -130,27 +131,13 @@ export default function HomePage() {
   }, [settings, day]);
 
   const bank = useMemo(() => (settings && day ? weekBank(loadAllDays(), settings) : null), [settings, day]);
-  const [bankDate, setBankDate] = useState<string | null>(null);
-  useEffect(() => {
-    try {
-      setBankDate(window.localStorage.getItem("mcd-planner:bank-use"));
-    } catch {}
-  }, []);
-  const isWeekendToday = [0, 6].includes(new Date().getDay());
-  const usingBank = isWeekendToday && bankDate === todayKey() && !!bank && bank.perWeekendDay > 0;
-  const toggleBank = (on: boolean) => {
-    const v = on ? todayKey() : null;
-    setBankDate(v);
-    try {
-      if (v) window.localStorage.setItem("mcd-planner:bank-use", v);
-      else window.localStorage.removeItem("mcd-planner:bank-use");
-    } catch {}
-  };
+  // Fri/Sat/Sun automatically get their share of what was saved Mon–Thu; the extra room goes to carbs.
+  const isSpendDay = [5, 6, 0].includes(new Date().getDay());
+  const bankBonus = isSpendDay && bank ? bank.perDay : 0;
   const baseTargets = settings ? effectiveTargets(settings, mode) : undefined;
-  // Spending the bank adds the weekend share on top; the extra room goes to carbs (protein and fat limits stay).
   const targets =
-    baseTargets && usingBank
-      ? { ...baseTargets, kcal: baseTargets.kcal + bank!.perWeekendDay, carbsRef: baseTargets.carbsRef + Math.round(bank!.perWeekendDay / 4) }
+    baseTargets && bankBonus > 0
+      ? { ...baseTargets, kcal: baseTargets.kcal + bankBonus, carbsRef: baseTargets.carbsRef + Math.round(bankBonus / 4) }
       : baseTargets;
   const eaten = useMemo(() => sumMacros(day?.entries.map((e) => e.macros) ?? []), [day]);
   const nadaCount = day?.entries.filter((e) => e.kind === "nada").length ?? 0;
@@ -462,7 +449,7 @@ export default function HomePage() {
           ))}
         </motion.div>
 
-        {bank && <BankCard bank={bank} isWeekend={isWeekendToday} using={usingBank} onToggle={toggleBank} />}
+        {bank && <BankCard bank={bank} />}
 
         {/* Evening nudge: weekday after 7pm with protein still short */}
         {(() => {
@@ -864,6 +851,9 @@ export default function HomePage() {
 
         <footer className="text-center text-[11px] text-muted/70 mt-12">
           {t("Personal nutrition planning tool. Not affiliated with McDonald's.", "أداة شخصية لتخطيط التغذية. غير تابعة لماكدونالدز.")}
+          <div className="mt-2 text-[12px] font-bold">
+            {t("Made by", "صُنع بواسطة")} <span className="gold-text">Mohammad Almansoori</span>
+          </div>
         </footer>
       </main>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { effectiveTargets, pctForCalories } from "@/lib/goals";
+import { bankBonusFor, effectiveTargets, pctForCalories } from "@/lib/goals";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -80,7 +80,7 @@ export default function ProgressPage() {
   const week = summarize(weekPoints, targets);
   const weekdaysLogged = weekPoints.filter((p) => p.totals && fromKey(p.date).getDay() % 6 !== 0);
   const proteinWeekdays = weekdaysLogged.filter((p) => p.totals!.protein >= targets.proteinMin).length;
-  const streak = weekdayStreak(days, targets);
+  const streak = weekdayStreak(days, targets, new Date(), (d) => bankBonusFor(d, days, settings));
   const strip = weekStrip(days, targets);
   const trend = weightTrend(weights);
   const rate = weeklyRate(weights);
@@ -156,7 +156,7 @@ export default function ProgressPage() {
           },
           { label: t("spent at McD", "صرفت في ماك"), value: spendWeek.orders ? `${Math.round(spendWeek.total)} ${aed}` : "—" },
         ],
-        footer: t("Personal nutrition log · not affiliated with McDonald's", "سجل تغذية شخصي · غير تابع لماكدونالدز"),
+        footer: t("McD Macro · by Mohammad Almansoori", "McD Macro · صُنع بواسطة Mohammad Almansoori"),
       });
       const res = await shareOrDownload(blob, `my-week-${todayKey}.png`);
       if (res === "downloaded") say(t("Image saved ✓", "انحفظت الصورة ✓"));

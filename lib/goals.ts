@@ -43,54 +43,63 @@ export function effectiveTargets(settings: Settings, mode: DayMode): Targets {
 
 const isWeekendDate = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
 
+export interface BankSaveDay {
+  date: string;
+  target: number;
+  /** null = not logged, so it doesn't count. */
+  eaten: number | null;
+  diff: number | null;
+}
+
+export interface BankSpendDay {
+  date: string;
+  target: number;
+  bonus: number;
+}
+
 export interface WeekBank {
-  /** kcal saved (positive) or overspent (negative) on logged days before today this week. */
+  /** Saved (positive) or over (negative), from logged Mon–Thu days only. */
   saved: number;
   loggedDays: number;
-  /** Weekend days still ahead, including today if it's Sat/Sun. */
-  weekendDaysLeft: number;
-  /** Extra kcal each remaining weekend day can take from the bank. */
-  perWeekendDay: number;
-  weeklyBudget: number;
-  eatenThisWeek: number;
+  saveDays: BankSaveDay[];
+  /** Friday, Saturday, Sunday — each gets an equal share of what you saved. */
+  spendDays: BankSpendDay[];
+  perDay: number;
 }
 
 /**
- * Calorie bank for the current week (Mon–Sun): what you saved vs target on days already logged
- * this week, spread over the weekend days still to come. Unlogged days don't count either way.
+ * Simple weekly calorie bank: Monday–Thursday you save (target − eaten, only for days you logged),
+ * and the total is split evenly over Friday, Saturday and Sunday. Overspending gives no bonus.
  */
 export function weekBank(days: Record<string, DayState>, settings: Settings, today = new Date()): WeekBank {
   const dow = today.getDay();
   const monday = new Date(today);
   monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
-  const todayKey = toKey(today);
-  let saved = 0;
-  let loggedDays = 0;
-  let weeklyBudget = 0;
-  let eatenThisWeek = 0;
-  let weekendDaysLeft = 0;
-  for (let i = 0; i < 7; i++) {
+  const at = (i: number) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    const key = toKey(d);
-    const target = effectiveTargets(settings, isWeekendDate(d) ? "weekend" : "workday").kcal;
-    weeklyBudget += target;
-    const day = days[key];
-    const eaten = day?.entries.length ? sumMacros(day.entries.map((e) => e.macros)).kcal : null;
-    if (eaten !== null) eatenThisWeek += eaten;
-    if (key < todayKey && eaten !== null) {
-      saved += target - eaten;
-      loggedDays++;
-    }
-    if (key >= todayKey && isWeekendDate(fromKey(key))) weekendDaysLeft++;
-  }
-  saved = Math.round(saved);
-  return {
-    saved,
-    loggedDays,
-    weekendDaysLeft,
-    perWeekendDay: weekendDaysLeft ? Math.round(saved / weekendDaysLeft) : 0,
-    weeklyBudget: Math.round(weeklyBudget),
-    eatenThisWeek: Math.round(eatenThisWeek),
+    return d;
   };
+  const saveDays: BankSaveDay[] = [0, 1, 2, 3].map((i) => {
+    const d = at(i);
+    const key = toKey(d);
+    const target = effectiveTargets(settings, "workday").kcal;
+    const day = days[key];
+    const eaten = day?.entries.length ? Math.round(sumMacros(day.entries.map((e) => e.macros)).kcal) : null;
+    return { date: key, target, eaten, diff: eaten === null ? null : target - eaten };
+  });
+  const saved = saveDays.reduce((n, d) => n + (d.diff ?? 0), 0);
+  const perDay = saved > 0 ? Math.round(saved / 3) : 0;
+  const spendDays: BankSpendDay[] = [4, 5, 6].map((i) => {
+    const d = at(i);
+    return { date: toKey(d), target: effectiveTargets(settings, isWeekendDate(d) ? "weekend" : "workday").kcal, bonus: perDay };
+  });
+  return { saved, loggedDays: saveDays.filter((d) => d.eaten !== null).length, saveDays, spendDays, perDay };
+}
+
+/** Extra kcal allowed on a given date from this week's bank (Fri–Sun only). */
+export function bankBonusFor(date: string, days: Record<string, DayState>, settings: Settings): number {
+  const d = fromKey(date);
+  if (![5, 6, 0].includes(d.getDay())) return 0;
+  return weekBank(days, settings, d).perDay;
 }

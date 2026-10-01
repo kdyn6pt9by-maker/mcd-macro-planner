@@ -3,107 +3,81 @@
 import { motion } from "framer-motion";
 import { WeekBank } from "@/lib/goals";
 import { useI18n } from "@/lib/i18n";
-import { AnimatedNumber } from "./AnimatedNumber";
+import { fromKey } from "@/lib/progress";
+import { todayKey } from "@/lib/storage";
 
-interface Props {
-  bank: WeekBank;
-  isWeekend: boolean;
-  using: boolean;
-  onToggle: (v: boolean) => void;
-}
-
-/** Weekly calorie bank: weekday savings become extra room on the weekend. */
-export function BankCard({ bank, isWeekend, using, onToggle }: Props) {
-  const { t } = useI18n();
-  const positive = bank.saved >= 0;
-  const usedPct = bank.weeklyBudget ? Math.min(100, (bank.eatenThisWeek / bank.weeklyBudget) * 100) : 0;
-  if (bank.loggedDays === 0 && !isWeekend) return null;
+/**
+ * Weekly calorie bank, kept dead simple:
+ * Mon–Thu shows what you saved each logged day; Fri, Sat, Sun each get an equal share on top of their target.
+ */
+export function BankCard({ bank }: { bank: WeekBank }) {
+  const { t, date } = useI18n();
+  const today = todayKey();
+  const day = (key: string) => date(fromKey(key), { weekday: "short" });
+  const fmt = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("en-US")}`;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mt-4 rounded-2xl p-4 ring-1"
-      style={{
-        background: positive
-          ? "linear-gradient(135deg, rgba(56,189,248,0.14), rgba(24,8,10,0.85) 70%)"
-          : "linear-gradient(135deg, rgba(218,41,28,0.18), rgba(24,8,10,0.85) 70%)",
-        borderColor: "transparent",
-      }}
+      className="mt-4 rounded-2xl p-4 ring-1 ring-sky-400/25"
+      style={{ background: "linear-gradient(135deg, rgba(56,189,248,0.12), rgba(24,8,10,0.85) 70%)" }}
     >
-      <div className="flex items-center gap-3">
-        <motion.span
-          className="text-2xl"
-          animate={positive && bank.saved > 0 ? { rotate: [0, -8, 8, 0], scale: [1, 1.1, 1] } : {}}
-          transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 2 }}
-        >
-          🏦
-        </motion.span>
-        <div className="flex-1 min-w-0">
-          <div className="text-[11px] uppercase tracking-[0.16em] text-muted">{t("Calorie bank · this week", "بنك السعرات · هالأسبوع")}</div>
-          <div className={`text-xl font-black ${positive ? "text-sky-300" : "text-[#ff8a7d]"}`}>
-            {positive ? "+" : "−"}
-            <AnimatedNumber value={Math.abs(bank.saved)} /> <span className="text-sm font-bold text-muted">kcal</span>
-          </div>
-        </div>
-        {bank.weekendDaysLeft > 0 && bank.saved > 0 && (
-          <div className="text-end">
-            <div className="text-[10px] text-muted">{t("per weekend day", "لكل يوم ويكند")}</div>
-            <div className="text-lg font-black text-sky-300">+{bank.perWeekendDay}</div>
-          </div>
-        )}
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-black">🏦 {t("Calorie bank", "بنك السعرات")}</div>
+        <div className="text-[10px] text-muted">{t("Save Mon–Thu → spend Fri–Sun", "توفّر الاثنين–الخميس ← تصرف الجمعة–الأحد")}</div>
       </div>
 
-      <div className="mt-3 h-1.5 rounded-full bg-white/5 overflow-hidden">
-        <motion.div
-          className={`h-full rounded-full ${usedPct > 100 ? "bg-red" : "bg-sky-300"}`}
-          initial={{ width: 0 }}
-          animate={{ width: `${usedPct}%` }}
-          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-        />
-      </div>
-      <div className="mt-1.5 text-[11px] text-muted">
-        {t(
-          `${bank.eatenThisWeek.toLocaleString("en-US")} of ${bank.weeklyBudget.toLocaleString("en-US")} kcal this week · ${bank.loggedDays} day${bank.loggedDays === 1 ? "" : "s"} counted`,
-          `${bank.eatenThisWeek.toLocaleString("en-US")} من ${bank.weeklyBudget.toLocaleString("en-US")} سعرة هالأسبوع · ${bank.loggedDays} أيام محسوبة`
-        )}
+      {/* Mon–Thu: what each logged day saved */}
+      <div className="grid grid-cols-4 gap-1.5 mt-3">
+        {bank.saveDays.map((d, i) => (
+          <motion.div
+            key={d.date}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className={`rounded-xl py-2 text-center ${d.date === today ? "ring-1 ring-gold/50" : ""} ${
+              d.diff === null ? "bg-white/[0.03]" : d.diff >= 0 ? "bg-sky-400/10" : "bg-red/15"
+            }`}
+          >
+            <div className="text-[10px] text-muted">{day(d.date)}</div>
+            <div className={`text-sm font-black ${d.diff === null ? "text-muted/50" : d.diff >= 0 ? "text-sky-300" : "text-[#ff8a7d]"}`}>
+              {d.diff === null ? "—" : fmt(d.diff)}
+            </div>
+          </motion.div>
+        ))}
       </div>
 
-      {isWeekend && bank.saved > 0 ? (
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={() => onToggle(!using)}
-          role="switch"
-          aria-checked={using}
-          className={`mt-3 w-full rounded-xl px-3 py-2.5 flex items-center gap-3 text-start ring-1 transition-colors ${
-            using ? "bg-sky-400/15 ring-sky-400/40" : "bg-black/25 ring-white/10"
-          }`}
-        >
-          <span className={`relative h-6 w-11 rounded-full transition-colors ${using ? "bg-sky-400" : "bg-white/15"}`}>
-            <motion.span
-              className="absolute top-0.5 h-5 w-5 rounded-full bg-white"
-              animate={{ insetInlineStart: using ? 22 : 2 }}
-              transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            />
-          </span>
-          <span className="flex-1 text-sm font-bold">
-            {using
-              ? t(`Spending the bank today: +${bank.perWeekendDay} kcal`, `تصرف من البنك اليوم: +${bank.perWeekendDay} سعرة`)
-              : t(`Use the bank today (+${bank.perWeekendDay} kcal)`, `استخدم البنك اليوم (+${bank.perWeekendDay} سعرة)`)}
-          </span>
-        </motion.button>
-      ) : (
-        <p className="mt-2 text-xs text-[#e8d5d6]">
-          {bank.saved > 0
-            ? t(
-                `Nice — that's +${Math.round(bank.saved / 2)} kcal for each weekend day if you keep it.`,
-                `حلو — يعني +${Math.round(bank.saved / 2)} سعرة لكل يوم ويكند إذا حافظت عليها.`
-              )
-            : bank.saved < 0
-              ? t("You're over for the week so far — a lighter day pays it back.", "إنت زايد هالأسبوع للحين — يوم أخف يرجعها.")
-              : t("Right on target so far this week.", "على الهدف بالضبط هالأسبوع للحين.")}
-        </p>
-      )}
+      <div className="flex items-center justify-center gap-2 my-2.5 text-sm">
+        <span className="text-muted">{t("Saved", "وفّرت")}</span>
+        <span className={`font-black text-lg ${bank.saved >= 0 ? "text-sky-300" : "text-[#ff8a7d]"}`}>{fmt(bank.saved)}</span>
+        <span className="text-muted">kcal</span>
+        {bank.perDay > 0 && <span className="text-muted">÷ 3 = <b className="text-sky-300">+{bank.perDay}</b></span>}
+      </div>
+
+      {/* Fri–Sun: target + share */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {bank.spendDays.map((d) => (
+          <div key={d.date} className={`rounded-xl py-2 text-center bg-black/30 ${d.date === today ? "ring-2 ring-gold/70" : ""}`}>
+            <div className="text-[10px] text-muted">{day(d.date)}</div>
+            <div className="text-base font-black">{(d.target + d.bonus).toLocaleString("en-US")}</div>
+            <div className="text-[10px] text-muted">
+              {d.bonus > 0 ? `${d.target.toLocaleString("en-US")} + ${d.bonus}` : t("normal", "عادي")}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[11px] text-muted mt-2.5">
+        {bank.loggedDays === 0
+          ? t("Log Monday to Thursday and whatever you save gets added to Friday, Saturday and Sunday.", "سجّل من الاثنين للخميس، واللي توفره ينضاف للجمعة والسبت والأحد.")
+          : bank.saved < 0
+            ? t("You're over Mon–Thu, so no bonus this weekend.", "إنت زايد من الاثنين للخميس، فما في زيادة هالويكند.")
+            : t(
+                `Only days you logged count (${bank.loggedDays}/4). The bonus is added to Fri–Sun automatically.`,
+                `تنحسب بس الأيام اللي سجلتها (${bank.loggedDays}/4). الزيادة تنضاف للجمعة–الأحد تلقائياً.`
+              )}
+      </p>
     </motion.div>
   );
 }

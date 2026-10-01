@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   title: "McD Macro",
   description: "Personal nutrition planning tool. Not affiliated with McDonald's.",
   manifest: "/manifest.json",
+  authors: [{ name: "Mohammad Almansoori" }],
+  creator: "Mohammad Almansoori",
   appleWebApp: {
     capable: true,
     title: "McD Macro",
