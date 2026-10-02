@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PayFlags, PayRequest, PaySheet } from "@/components/PaySheet";
 import { roundMacros, sumMacros } from "@/lib/engine/macros";
+import { isBreakfast } from "@/lib/foodGroups";
 import { combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
 import { useI18n } from "@/lib/i18n";
 import { recentAmounts } from "@/lib/insights";
@@ -46,11 +47,11 @@ export default function QuickPage() {
     return findRecommendations({
       eaten,
       targets,
-      foods: settings.foods,
+      foods: settings.foods.filter((f) => !isBreakfast(f)),
       nadaItem: nada,
       nadaBottlesRemaining: settings.nada.maxPerDay - day.entries.filter((e) => e.kind === "nada").length,
       maxResults: 3,
-    });
+    }).sort((a, b) => b.totals.kcal - a.totals.kcal);
   }, [settings, day, eaten]);
 
   function eat(c: Combination) {

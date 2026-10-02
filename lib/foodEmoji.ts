@@ -4,6 +4,7 @@ export function foodEmoji(idOrName: string): string {
   if (s.includes("nugget") || s.includes("tender")) return "🍗";
   if (s.includes("breakfast") || s.includes("mcmuffin")) return "🍳";
   if (s.includes("mcarabia")) return "🌯";
+  if (s.includes("fries")) return "🍟";
   if (s.includes("nada")) return "🥛";
   if (s.includes("ice-cream") || s.includes("ice cream") || s.includes("mcflurry") || s.includes("sundae")) return "🍦";
   return "🍔";

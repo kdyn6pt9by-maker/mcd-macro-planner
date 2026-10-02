@@ -40,6 +40,7 @@ export const OFFICIAL_UAE_MENU: FoodItem[] = [
   item("big-breakfast", "Big Breakfast", 431, 29, 18, 28, "big-breakfast"),
   item("mcarabia-chicken", "McArabia Chicken", 562, 29, 25, 56, "mcarabia-chicken"),
   item("mccrispy", "McCrispy", 619, 28, 30, 58, "mccrispy"),
+  item("small-fries", "Small Fries", 250, 3, 12, 33, "small-fries"),
 ];
 
 const norm = (s: string) => s.toLowerCase().replace(/™/g, "").replace(/[^a-z0-9]/g, "");

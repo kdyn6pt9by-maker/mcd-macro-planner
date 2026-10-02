@@ -25,7 +25,7 @@ describe("settings migration", () => {
     const v1 = { ...defaultSettings, version: undefined, nada: { ...defaultSettings.nada, maxPerDay: 3 } };
     const migrated = migrateSettings(v1 as never);
     expect(migrated.nada.maxPerDay).toBe(4);
-    expect(migrated.version).toBe(7);
+    expect(migrated.version).toBe(8);
     expect(migrated.foods.some((f) => f.id === "ice-cream-cone")).toBe(true);
     expect(migrated.goal).toEqual({ mode: "maintain", pct: 20 });
     expect(migrated.savedMeals).toEqual([]);
@@ -227,7 +227,7 @@ describe("official McDonald's UAE menu (v6)", () => {
     const old = { ...defaultSettings, version: 5, foods: [{ id: "big-mac", name: "Big Mac", category: "mcdonalds" as const, macros: { kcal: 549, protein: 23, fat: 30, carbs: 46 }, verified: true, enabled: true }] };
     window.localStorage.setItem("mcd-planner:settings", JSON.stringify(old));
     saveDay({ date: "2026-09-20", entries: [{ id: "x", kind: "mcdonalds", label: "Big Mac", macros: { kcal: 549, protein: 23, fat: 30, carbs: 46 }, at: "" }] });
-    expect(loadSettings().version).toBe(7);
+    expect(loadSettings().version).toBe(8);
     expect(loadDay("2026-09-20").entries[0].macros.kcal).toBe(564);
   });
 });

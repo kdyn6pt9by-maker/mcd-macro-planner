@@ -38,6 +38,7 @@ import { smartAdvice } from "@/lib/engine/advice";
 import { roundMacros, scaleMacros, sumMacros } from "@/lib/engine/macros";
 import { MAX_RECOMMENDATIONS, combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
 import { useI18n } from "@/lib/i18n";
+import { isBreakfast } from "@/lib/foodGroups";
 import { cloneEntries, costSummary, prunePayments, recentAmounts } from "@/lib/insights";
 import { editOrder, orderQty } from "@/lib/logging";
 import { STREAK_MILESTONE, fromKey, pendingWeekendDays, toKey, weekdayStreak } from "@/lib/progress";
@@ -69,7 +70,7 @@ import { Combination, DayEntry, DayMode, DayState, FoodItem, Macros, Settings } 
 const PAGE = 5;
 const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
-type Filter = "all" | "beef" | "chicken";
+type Filter = "all" | "beef" | "chicken" | "breakfast";
 const isChicken = (f: FoodItem) => /chicken|nugget/i.test(f.id + f.name);
 type NewEntry = Omit<DayEntry, "id" | "at">;
 
@@ -227,11 +228,15 @@ export default function HomePage() {
     return findRecommendations({
       eaten,
       targets,
-      foods: settings.foods.filter((f) => (filter === "all" ? true : filter === "chicken" ? isChicken(f) : !isChicken(f))),
+      // Breakfast items only come up under the breakfast filter.
+      foods: settings.foods.filter((f) =>
+        filter === "breakfast" ? isBreakfast(f) : !isBreakfast(f) && (filter === "all" ? true : filter === "chicken" ? isChicken(f) : !isChicken(f))
+      ),
       nadaItem: nadaFood,
       nadaBottlesRemaining: settings.nada.maxPerDay - nadaCount,
       maxResults: MAX_RECOMMENDATIONS,
-    });
+      // Shown from most to fewest calories (labels like BEST MATCH stay on their order).
+    }).sort((a, b) => b.totals.kcal - a.totals.kcal);
   }, [settings, targets, eaten, nadaFood, nadaCount, filter]);
 
   const dayName = (date: string) =>
@@ -789,8 +794,8 @@ export default function HomePage() {
                     {t("Hide", "إخفاء")}
                   </button>
                 </div>
-                <div className="relative grid grid-cols-3 p-1 rounded-2xl glass mb-4">
-                  {(["all", "beef", "chicken"] as Filter[]).map((f) => (
+                <div className="relative grid grid-cols-4 p-1 rounded-2xl glass mb-4">
+                  {(["all", "beef", "chicken", "breakfast"] as Filter[]).map((f) => (
                     <button
                       key={f}
                       onClick={() => {
@@ -803,7 +808,13 @@ export default function HomePage() {
                         <motion.span layoutId="filter-pill" className="absolute inset-0 rounded-xl bg-gold" transition={{ type: "spring", stiffness: 500, damping: 35 }} />
                       )}
                       <span className="relative">
-                        {f === "all" ? t("🍔 All", "🍔 الكل") : f === "beef" ? t("🥩 Beef", "🥩 لحم") : t("🍗 Chicken", "🍗 دجاج")}
+                        {f === "all"
+                          ? t("🍔 All", "🍔 الكل")
+                          : f === "beef"
+                            ? t("🥩 Beef", "🥩 لحم")
+                            : f === "chicken"
+                              ? t("🍗 Chicken", "🍗 دجاج")
+                              : t("🍳 Breakfast", "🍳 فطور")}
                       </span>
                     </button>
                   ))}
