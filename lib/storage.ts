@@ -69,6 +69,11 @@ export function migrateSettings(stored: Partial<Settings> | null): Settings {
     // v1 installs opened before the nutrition data landed still hold zeroed items.
     if (merged.foods.every((f) => f.macros.kcal === 0)) merged.foods = defaultSettings.foods;
   }
+  if (merged.version < 5) {
+    // v5 added the Ice Cream Cone; keep the user's own edits to existing items.
+    const have = new Set(merged.foods.map((f) => f.id));
+    merged.foods = [...merged.foods, ...defaultSettings.foods.filter((f) => !have.has(f.id))];
+  }
   merged.version = SETTINGS_VERSION;
   return merged;
 }
@@ -203,7 +208,7 @@ interface Backup {
 
 export function exportBackup(): Backup {
   const data: Record<string, unknown> = {};
-  for (const key of [SETTINGS_KEY, DAYS_KEY, MODE_KEY, HISTORY_KEY, WEIGHTS_KEY, WEEKEND_SKIP_KEY, CELEBRATED_KEY, "mcd-planner:barcodes"]) data[key] = safeGet<unknown>(key, null);
+  for (const key of [SETTINGS_KEY, DAYS_KEY, MODE_KEY, HISTORY_KEY, WEIGHTS_KEY, WEEKEND_SKIP_KEY, CELEBRATED_KEY, "mcd-planner:barcodes", "mcd-planner:reserve"]) data[key] = safeGet<unknown>(key, null);
   return { format: BACKUP_FORMAT, exportedAt: new Date().toISOString(), data };
 }
 

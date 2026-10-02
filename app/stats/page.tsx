@@ -607,7 +607,7 @@ export default function StatsPage() {
         open={sheet === "menu"}
         initialDate={logDate}
         onClose={() => setSheet(null)}
-        foods={settings.foods.filter((f) => f.enabled && f.verified)}
+        foods={settings.foods.filter((f) => f.enabled)}
         eatenOn={eatenOn}
         targets={effectiveTargets(settings, "workday")}
         onAdd={addOrder}
@@ -617,7 +617,7 @@ export default function StatsPage() {
         initialDate={editing?.date}
         initialQty={editing?.qty}
         onClose={() => setEditing(null)}
-        foods={settings.foods.filter((f) => f.enabled && f.verified)}
+        foods={settings.foods.filter((f) => f.enabled)}
         eatenOn={eatenOn}
         targets={effectiveTargets(settings, "workday")}
         onAdd={(lines) => {

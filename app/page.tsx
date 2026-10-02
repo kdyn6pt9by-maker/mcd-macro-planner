@@ -1,7 +1,23 @@
 "use client";
 
-import { bankBonusFor, effectiveTargets, weekBank } from "@/lib/goals";
+import { effectiveTargets, weekBank } from "@/lib/goals";
 import { BankCard } from "@/components/BankCard";
+import { BankPrompt } from "@/components/BankPrompt";
+import { ReserveCard } from "@/components/ReserveCard";
+import {
+  EMPTY_RESERVE,
+  Payback,
+  ReserveState,
+  WeekendChoice,
+  dayAdjust,
+  loadReserve,
+  mondayOf,
+  paybackFor,
+  pendingOverage,
+  pendingWeekendChoice,
+  reserveBalance,
+  saveReserve,
+} from "@/lib/reserve";
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -75,6 +91,7 @@ export default function HomePage() {
   const [weekendDates, setWeekendDates] = useState<string[]>([]);
   const [celebrate, setCelebrate] = useState<number | null>(null);
   const [streak, setStreak] = useState(0);
+  const [reserve, setReserve] = useState<ReserveState>(EMPTY_RESERVE);
   const [toast, setToast] = useState<ToastData | null>(null);
   const [favorites, setFavorites] = useState<HistoryEntry[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
@@ -120,7 +137,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!settings || !day) return;
     const all = loadAllDays();
-    const s = weekdayStreak(all, effectiveTargets(settings, "workday"), new Date(), (d) => bankBonusFor(d, all, settings));
+    const s = weekdayStreak(all, effectiveTargets(settings, "workday"), new Date(), (d) => dayAdjust(d, all, settings, reserve).total);
     setStreak(s);
     const celebrated = loadCelebratedStreak();
     if (s < celebrated) saveCelebratedStreak(s - (s % STREAK_MILESTONE));
@@ -128,17 +145,60 @@ export default function HomePage() {
       saveCelebratedStreak(s);
       setCelebrate(s);
     }
-  }, [settings, day]);
+  }, [settings, day, reserve]);
 
-  const bank = useMemo(() => (settings && day ? weekBank(loadAllDays(), settings) : null), [settings, day]);
-  // Fri/Sat/Sun automatically get their share of what was saved Mon–Thu; the extra room goes to carbs.
-  const isSpendDay = [5, 6, 0].includes(new Date().getDay());
-  const bankBonus = isSpendDay && bank ? bank.perDay : 0;
+  useEffect(() => setReserve(loadReserve()), []);
+  const updateReserve = useCallback((next: ReserveState) => {
+    saveReserve(next);
+    setReserve(next);
+  }, []);
+
+  const allDays = useMemo(() => (day ? loadAllDays() : {}), [day]);
+  const bank = useMemo(
+    () => (settings && day ? weekBank(allDays, settings, new Date(), (d) => paybackFor(d, reserve)) : null),
+    [settings, day, allDays, reserve]
+  );
+  const adjustOn = useCallback((date: string) => dayAdjust(date, allDays, settings!, reserve), [allDays, settings, reserve]);
+  const reserveInfo = useMemo(() => (settings ? reserveBalance(allDays, settings, reserve) : { balance: 0, lines: [] }), [allDays, settings, reserve]);
+  // Today's target moves by: the Fri–Sun bank share (unless stored), reserve withdrawals, minus any weekend payback.
+  // The extra (or missing) room goes to carbs.
+  const adjust = settings && day ? adjustOn(todayKey()) : null;
   const baseTargets = settings ? effectiveTargets(settings, mode) : undefined;
   const targets =
-    baseTargets && bankBonus > 0
-      ? { ...baseTargets, kcal: baseTargets.kcal + bankBonus, carbsRef: baseTargets.carbsRef + Math.round(bankBonus / 4) }
+    baseTargets && adjust && adjust.total !== 0
+      ? { ...baseTargets, kcal: baseTargets.kcal + adjust.total, carbsRef: Math.max(0, baseTargets.carbsRef + Math.round(adjust.total / 4)) }
       : baseTargets;
+  // Bank questions wait until the weekend check-in and any celebration are out of the way.
+  const promptsFree = weekendDates.length === 0 && celebrate === null;
+  const weekendChoice = settings && day && promptsFree ? pendingWeekendChoice(todayKey(), allDays, settings, reserve) : null;
+  const overage = settings && day && promptsFree && !weekendChoice ? pendingOverage(todayKey(), allDays, settings, reserve) : null;
+
+  function chooseWeekend(date: string, choice: WeekendChoice) {
+    updateReserve({ ...reserve, choices: { ...reserve.choices, [date]: choice } });
+    showToast(choice === "store" ? t("🐷 Stored — normal calories today", "🐷 انخزنت — سعراتك عادية اليوم") : t("🍔 Extra calories added to today", "🍔 انضافت السعرات الإضافية لليوم"));
+  }
+
+  function toggleWeekend(date: string) {
+    chooseWeekend(date, reserve.choices[date] === "store" ? "use" : "store");
+  }
+
+  function decideOverage(monday: string, decision: Payback["decision"]) {
+    if (!overage || !settings) return;
+    const today = todayKey();
+    const next: ReserveState = {
+      ...reserve,
+      paybacks: { ...reserve.paybacks, [monday]: { decision, over: overage.over, perDay: overage.perDay, from: today } },
+      moves: decision === "cover" ? [...reserve.moves, { id: uid(), date: today, kcal: overage.over, kind: "cover" }] : reserve.moves,
+    };
+    updateReserve(next);
+    showToast(
+      decision === "reduce"
+        ? t(`✂️ −${overage.perDay} kcal a day until Thursday`, `✂️ −${overage.perDay} سعرة باليوم لين الخميس`)
+        : decision === "cover"
+          ? t("🐷 Covered from your reserve", "🐷 تغطّت من المخزون")
+          : t("👍 Carrying on normally", "👍 نكمل طبيعي")
+    );
+  }
   const eaten = useMemo(() => sumMacros(day?.entries.map((e) => e.macros) ?? []), [day]);
   const nadaCount = day?.entries.filter((e) => e.kind === "nada").length ?? 0;
   const usualAdded = day?.entries.some((e) => e.kind === "usual") ?? false;
@@ -449,7 +509,27 @@ export default function HomePage() {
           ))}
         </motion.div>
 
-        {bank && <BankCard bank={bank} />}
+        {bank && settings && (
+          <BankCard
+            bank={bank}
+            adjust={adjustOn}
+            choices={reserve.choices}
+            payback={reserve.paybacks[mondayOf(todayKey())]}
+            onToggle={toggleWeekend}
+          />
+        )}
+        {(reserveInfo.lines.length > 0 || reserveInfo.balance !== 0) && (
+          <ReserveCard
+            balance={reserveInfo.balance}
+            lines={reserveInfo.lines}
+            todayWithdrawn={adjust?.withdrawn ?? 0}
+            onWithdraw={(kcal) => {
+              updateReserve({ ...reserve, moves: [...reserve.moves, { id: uid(), date: todayKey(), kcal, kind: "withdraw" }] });
+              showToast(t(`🐷 +${kcal} kcal added to today`, `🐷 +${kcal} سعرة انضافت لليوم`));
+            }}
+            onRemove={(id) => updateReserve({ ...reserve, moves: reserve.moves.filter((m) => m.id !== id) })}
+          />
+        )}
 
         {/* Evening nudge: weekday after 7pm with protein still short */}
         {(() => {
@@ -860,7 +940,7 @@ export default function HomePage() {
       <McMenuSheet
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        foods={settings.foods.filter((f) => f.enabled && f.verified)}
+        foods={settings.foods.filter((f) => f.enabled)}
         eatenOn={eatenOn}
         targets={targets}
         onAdd={(lines, date) =>
@@ -875,7 +955,7 @@ export default function HomePage() {
         initialDate={editing?.date}
         initialQty={editing?.qty}
         onClose={() => setEditing(null)}
-        foods={settings.foods.filter((f) => f.enabled && f.verified)}
+        foods={settings.foods.filter((f) => f.enabled)}
         eatenOn={eatenOn}
         targets={targets}
         onAdd={(lines) => {
@@ -906,6 +986,7 @@ export default function HomePage() {
       <Toast toast={toast} onDismiss={() => setToast(null)} />
       <UpdateBanner />
       <WeekendCheckIn dates={weekendDates} onSave={saveWeekend} />
+      <BankPrompt choice={weekendChoice} overage={overage} balance={reserveInfo.balance} onChoose={chooseWeekend} onOverage={decideOverage} />
       <Celebration streak={celebrate} onDone={() => setCelebrate(null)} />
     </MotionConfig>
   );

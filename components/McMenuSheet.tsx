@@ -150,7 +150,9 @@ export function McMenuSheet({ open, initialDate, initialQty, onClose, foods, eat
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm truncate">{foodEmoji(f.id + f.name)} {f.name}</div>
+                      <div className="font-semibold text-sm truncate">{foodEmoji(f.id + f.name)} {f.name}
+                        {!f.verified && <span className="ms-1.5 text-[9px] font-bold text-warn align-middle">⚠ {t("unverified", "غير موثّق")}</span>}
+                      </div>
                       <div className="text-[11px] text-muted mt-0.5">
                         <span className="text-gold">{f.macros.kcal}</span> kcal ·{" "}
                         <span className="text-success">P {f.macros.protein}</span> · <span className="text-warn">F {f.macros.fat}</span> ·{" "}

@@ -71,7 +71,13 @@ export interface WeekBank {
  * Simple weekly calorie bank: Monday–Thursday you save (target − eaten, only for days you logged),
  * and the total is split evenly over Friday, Saturday and Sunday. Overspending gives no bonus.
  */
-export function weekBank(days: Record<string, DayState>, settings: Settings, today = new Date()): WeekBank {
+export function weekBank(
+  days: Record<string, DayState>,
+  settings: Settings,
+  today = new Date(),
+  /** kcal taken off a Mon–Thu target while paying back a weekend overage — not counted as savings. */
+  paybackFor: (date: string) => number = () => 0
+): WeekBank {
   const dow = today.getDay();
   const monday = new Date(today);
   monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
@@ -83,7 +89,7 @@ export function weekBank(days: Record<string, DayState>, settings: Settings, tod
   const saveDays: BankSaveDay[] = [0, 1, 2, 3].map((i) => {
     const d = at(i);
     const key = toKey(d);
-    const target = effectiveTargets(settings, "workday").kcal;
+    const target = effectiveTargets(settings, "workday").kcal - paybackFor(key);
     const day = days[key];
     const eaten = day?.entries.length ? Math.round(sumMacros(day.entries.map((e) => e.macros)).kcal) : null;
     return { date: key, target, eaten, diff: eaten === null ? null : target - eaten };

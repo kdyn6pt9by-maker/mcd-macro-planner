@@ -1,6 +1,7 @@
 "use client";
 
-import { bankBonusFor, effectiveTargets, pctForCalories } from "@/lib/goals";
+import { effectiveTargets, pctForCalories } from "@/lib/goals";
+import { dayAdjust, loadReserve } from "@/lib/reserve";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -80,7 +81,8 @@ export default function ProgressPage() {
   const week = summarize(weekPoints, targets);
   const weekdaysLogged = weekPoints.filter((p) => p.totals && fromKey(p.date).getDay() % 6 !== 0);
   const proteinWeekdays = weekdaysLogged.filter((p) => p.totals!.protein >= targets.proteinMin).length;
-  const streak = weekdayStreak(days, targets, new Date(), (d) => bankBonusFor(d, days, settings));
+  const reserve = loadReserve();
+  const streak = weekdayStreak(days, targets, new Date(), (d) => dayAdjust(d, days, settings, reserve).total);
   const strip = weekStrip(days, targets);
   const trend = weightTrend(weights);
   const rate = weeklyRate(weights);

@@ -135,9 +135,21 @@ export const defaultMcDonaldsFoods: FoodItem[] = [
     41,
     "https://www.mcdonalds.com/ae/en-ae/product/quarter-pounder-with-cheese.html"
   ),
+  {
+    // mcdonalds.com/ae is blocked from the build environment, so these are McDonald's US reference values
+    // (vanilla cone: 200 kcal, 5 g protein, 5 g fat, 33 g carbs). Left unverified — check the UAE app and
+    // tick "Verified" in Settings once confirmed; until then it never enters recommendations.
+    id: "ice-cream-cone",
+    name: "Ice Cream Cone",
+    category: "mcdonalds",
+    macros: { kcal: 200, protein: 5, fat: 5, carbs: 33 },
+    source: "https://www.mcdonalds.com/ae/en-ae/product/ice-cream-cone.html",
+    verified: false,
+    enabled: true,
+  },
 ];
 
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 
 export const defaultSettings: Settings = {
   version: SETTINGS_VERSION,
