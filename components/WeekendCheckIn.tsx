@@ -1,6 +1,7 @@
 "use client";
 
 import { useI18n } from "@/lib/i18n";
+import { useKeyboardSheetStyle } from "@/lib/useKeyboardInset";
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -27,6 +28,7 @@ interface Props {
 
 export function WeekendCheckIn({ dates, onSave }: Props) {
   const { t, date } = useI18n();
+  const sheetStyle = useKeyboardSheetStyle({ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" });
   const [values, setValues] = useState<Record<string, Fields>>({});
   const [skip, setSkip] = useState<Record<string, boolean>>({});
 
@@ -53,7 +55,7 @@ export function WeekendCheckIn({ dates, onSave }: Props) {
           <motion.div className="fixed inset-0 z-40 bg-black/75 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
           <motion.div
             className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-[2rem] glass px-5 pt-5 max-h-[92dvh] overflow-y-auto"
-            style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
+            style={sheetStyle}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}

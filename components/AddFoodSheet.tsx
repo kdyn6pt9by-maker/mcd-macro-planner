@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useDragControls } from "framer-motion";
 import { useEffect, useState } from "react";
 import { kcalFromMacros } from "@/lib/engine/macros";
 import { useI18n } from "@/lib/i18n";
+import { useKeyboardSheetStyle } from "@/lib/useKeyboardInset";
 import { todayKey } from "@/lib/storage";
 import { Macros, SavedMeal } from "@/lib/types";
 import { AnimatedNumber } from "./AnimatedNumber";
@@ -58,6 +59,7 @@ const num = (s: string) => {
 
 export function AddFoodSheet({ open, initialDate, savedMeals, onClose, onAdd, onSetTotals }: Props) {
   const { t } = useI18n();
+  const sheetStyle = useKeyboardSheetStyle({ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" });
   const dragControls = useDragControls();
   const [mode, setMode] = useState<Mode>("add");
   const [date, setDate] = useState(todayKey());
@@ -120,7 +122,7 @@ export function AddFoodSheet({ open, initialDate, savedMeals, onClose, onAdd, on
           />
           <motion.div
             className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-[2rem] glass px-5 pt-3 max-h-[94dvh] overflow-y-auto overscroll-contain"
-            style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
+            style={sheetStyle}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
