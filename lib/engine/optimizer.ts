@@ -3,6 +3,13 @@ import { ZERO_MACROS, addMacros, roundMacros, scaleMacros } from "./macros";
 
 const MAX_ITEMS_PER_COMBO = 5;
 const MAX_RESULTS = 10;
+/** Hard cap for "show more" — the search is computed once, so this stays fast on a phone. */
+export const MAX_RECOMMENDATIONS = 50;
+/**
+ * Most a recommendation may go past your calories. Menu items come in fixed sizes, so orders rarely land exactly;
+ * this keeps the miss small on the "over" side (it used to allow +150).
+ */
+export const KCAL_OVER_ALLOWANCE = 50;
 const MAX_PER_MAIN_ITEM = 2;
 /** ~600 kcal of calorie-gap penalty; keeps variety from dragging in poor fits. */
 const DIVERSITY_SCORE_WINDOW = 3000;
@@ -124,7 +131,7 @@ export function findRecommendations(opts: SearchOptions): Combination[] {
     // Hard rule: never intentionally recommend over the fat ceiling.
     if (afterEating.fat > targets.fatMax) continue;
     // Don't bother with combos that blow calories way past target.
-    if (totals.kcal > remainingKcal + 150) continue;
+    if (totals.kcal > remainingKcal + KCAL_OVER_ALLOWANCE) continue;
 
     const itemCount = items.reduce((n, i) => n + i.qty, 0);
     const score = scoreCombination(totals, afterEating, targets, remainingKcal, itemCount);
@@ -142,7 +149,7 @@ export function findRecommendations(opts: SearchOptions): Combination[] {
   }
 
   candidates.sort((a, b) => a.score - b.score);
-  return labelCombinations(pickDiverse(candidates, opts.maxResults ?? MAX_RESULTS));
+  return labelCombinations(pickDiverse(candidates, Math.min(opts.maxResults ?? MAX_RESULTS, MAX_RECOMMENDATIONS)));
 }
 
 /** Which McDonald's items (ignoring quantity and Nada) make up the order. */
@@ -183,7 +190,8 @@ function pickDiverse(sorted: Combination[], limit: number): Combination[] {
     signatures.add(sig);
     mainCounts.set(main, (mainCounts.get(main) ?? 0) + 1);
   }
-  for (const c of pool) {
+  // "Show more" asks for more than the first page: keep going down the full ranking, still one per sandwich mix.
+  for (const c of limit > MAX_RESULTS ? sorted : pool) {
     if (chosen.length >= limit) break;
     if (!chosen.includes(c) && !signatures.has(sandwichSignature(c))) {
       chosen.push(c);

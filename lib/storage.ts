@@ -1,6 +1,6 @@
 import { DayMode, DayState, FoodItem, Macros, Settings } from "./types";
 import { SETTINGS_VERSION, defaultSettings } from "./data/defaultSettings";
-import { applyOfficialMenu } from "./data/officialMenu";
+import { applyOfficialMenu, applyOfficialNuggets } from "./data/officialMenu";
 import type { WeightEntry } from "./progress";
 
 const SETTINGS_KEY = "mcd-planner:settings";
@@ -79,6 +79,10 @@ export function migrateSettings(stored: Partial<Settings> | null): Settings {
     // v6: official McDonald's UAE numbers for every known item, new items added, wings removed.
     merged.foods = applyOfficialMenu(merged.foods);
   }
+  if (merged.version < 7) {
+    // v7: McNuggets 4 / 6 / 9 on the exact official numbers (4 pieces newly added).
+    merged.foods = applyOfficialNuggets(merged.foods);
+  }
   merged.version = SETTINGS_VERSION;
   return merged;
 }
@@ -86,8 +90,9 @@ export function migrateSettings(stored: Partial<Settings> | null): Settings {
 export function loadSettings(): Settings {
   const stored = safeGet<Partial<Settings> | null>(SETTINGS_KEY, null);
   const settings = migrateSettings(stored);
-  if (stored && (stored.version ?? 1) < 6) {
-    // The official menu update also rewrites past days, matched by the name each item was logged under.
+  if (stored && (stored.version ?? 1) < SETTINGS_VERSION) {
+    // Official menu updates also rewrite past days, matched by the name each item was logged under
+    // (items whose numbers didn't change are left as they are).
     for (const before of stored.foods ?? []) {
       const after = settings.foods.find((f) => f.id === before.id) ?? settings.foods.find((f) => f.name === before.name);
       if (after && before.category === "mcdonalds") updateProductEverywhere({ kind: "mcdonalds", id: after.id, name: before.name }, after.macros);

@@ -119,3 +119,19 @@ describe("findRecommendations", () => {
     expect(results[0].afterEating.protein).toBeGreaterThanOrEqual(targets.proteinMin - 20);
   });
 });
+
+describe("show more", () => {
+  it("returns more distinct options on request, capped, never more than +50 kcal over", async () => {
+    const { MAX_RECOMMENDATIONS, KCAL_OVER_ALLOWANCE } = await import("./optimizer");
+    const { defaultSettings } = await import("../data/defaultSettings");
+    const targets = { kcal: 2000, proteinMin: 140, fatMin: 50, fatMax: 60, carbsRef: 225 };
+    const eaten = { kcal: 900, protein: 70, fat: 20, carbs: 100 };
+    const base = { eaten, targets, foods: defaultSettings.foods, nadaItem: null, nadaBottlesRemaining: 0 };
+    const page = findRecommendations(base);
+    const many = findRecommendations({ ...base, maxResults: 999 });
+    expect(many.length).toBeGreaterThan(page.length);
+    expect(many.length).toBeLessThanOrEqual(MAX_RECOMMENDATIONS);
+    expect(new Set(many.map(sandwichSignature)).size).toBe(many.length);
+    expect(many.every((c) => c.remainingKcal >= -KCAL_OVER_ALLOWANCE)).toBe(true);
+  });
+});

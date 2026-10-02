@@ -4,7 +4,7 @@ import { FoodItem } from "../types";
  * Official McDonald's UAE nutrition, read from the data feed behind mcdonalds.com/ae/en-ae product pages
  * (/dnaapp/itemDetails?country=AE) on 2026-10-02. Calories are McDonald's lab/supplier values — they are not
  * 4/4/9 from the rounded macros, so they won't add up exactly; keep them as published.
- * McNuggets are only published as 4 pieces (153 kcal / 10 P / 8 F / 10 C); 6 and 9 pieces are that × 1.5 and × 2.25.
+ * McNuggets 6 and 9 pieces aren't linked from the menu, but have their own entries in the same feed (items 200072, 200036).
  */
 export const OFFICIAL_DATE = "2026-10-02";
 const url = (slug: string) => `https://www.mcdonalds.com/ae/en-ae/product/${slug}.html`;
@@ -27,8 +27,9 @@ export const OFFICIAL_UAE_MENU: FoodItem[] = [
   item("chicken-mac", "Chicken Mac", 558, 26, 26, 55, "chicken-mac"),
   item("cheeseburger", "Cheeseburger", 305, 13, 13, 32, "cheeseburger"),
   item("double-cheeseburger", "Double Cheeseburger", 450, 21, 24, 34, "double-cheese-burger"),
-  item("mcnuggets-6", "Chicken McNuggets (6 pc)", 230, 15, 12, 15, "chicken-mcnuggets-4-pieces"),
-  item("mcnuggets-9", "Chicken McNuggets (9 pc)", 344, 22.5, 18, 22.5, "chicken-mcnuggets-4-pieces"),
+  item("mcnuggets-4", "Chicken McNuggets (4 pc)", 153, 10, 8, 10, "chicken-mcnuggets-4-pieces"),
+  item("mcnuggets-6", "Chicken McNuggets (6 pc)", 229, 15, 12, 15, "chicken-mcnuggets-4-pieces"),
+  item("mcnuggets-9", "Chicken McNuggets (9 pc)", 343, 23, 18, 22, "chicken-mcnuggets-4-pieces"),
   item("beef-burger", "Beef Burger", 254, 11, 9, 31, "beef-burger"),
   item("chickenburger", "Chickenburger", 286, 13, 10, 36, "chicken-burger"),
   item("quarter-pounder-cheese", "Quarter Pounder with Cheese", 536, 33, 27, 41, "quarter-pounder-with-cheese"),
@@ -42,6 +43,19 @@ export const OFFICIAL_UAE_MENU: FoodItem[] = [
 ];
 
 const norm = (s: string) => s.toLowerCase().replace(/™/g, "").replace(/[^a-z0-9]/g, "");
+
+const NUGGET_IDS = ["mcnuggets-4", "mcnuggets-6", "mcnuggets-9"];
+
+/** Puts the 4/6/9 McNuggets on the exact official numbers (adding any that are missing); everything else untouched. */
+export function applyOfficialNuggets(foods: FoodItem[]): FoodItem[] {
+  const official = OFFICIAL_UAE_MENU.filter((f) => NUGGET_IDS.includes(f.id));
+  const out = foods.map((f) => {
+    const o = official.find((x) => x.id === f.id || norm(x.name) === norm(f.name));
+    return o ? { ...f, macros: { ...o.macros }, source: o.source, lastVerified: OFFICIAL_DATE, verified: true } : f;
+  });
+  for (const o of official) if (!out.some((f) => f.id === o.id || norm(f.name) === norm(o.name))) out.push({ ...o });
+  return out;
+}
 
 /**
  * Brings a saved menu onto the official numbers: known items get the official macros (and are marked verified),

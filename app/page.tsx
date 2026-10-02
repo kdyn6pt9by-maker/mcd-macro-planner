@@ -36,7 +36,7 @@ import { UpdateBanner, isUpdateAvailable, reloadApp } from "@/components/UpdateB
 import { WeekendCheckIn } from "@/components/WeekendCheckIn";
 import { smartAdvice } from "@/lib/engine/advice";
 import { roundMacros, scaleMacros, sumMacros } from "@/lib/engine/macros";
-import { combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
+import { MAX_RECOMMENDATIONS, combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
 import { useI18n } from "@/lib/i18n";
 import { cloneEntries, costSummary, prunePayments, recentAmounts } from "@/lib/insights";
 import { editOrder, orderQty } from "@/lib/logging";
@@ -65,6 +65,8 @@ import {
 } from "@/lib/storage";
 import { Combination, DayEntry, DayMode, DayState, FoodItem, Macros, Settings } from "@/lib/types";
 
+/** Recommendations shown per "more" tap. */
+const PAGE = 5;
 const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
 type Filter = "all" | "beef" | "chicken";
@@ -95,7 +97,7 @@ export default function HomePage() {
   const [toast, setToast] = useState<ToastData | null>(null);
   const [favorites, setFavorites] = useState<HistoryEntry[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
-  const [showAll, setShowAll] = useState(false);
+  const [shown, setShown] = useState(PAGE);
   const [yesterday, setYesterday] = useState<DayState | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -228,6 +230,7 @@ export default function HomePage() {
       foods: settings.foods.filter((f) => (filter === "all" ? true : filter === "chicken" ? isChicken(f) : !isChicken(f))),
       nadaItem: nadaFood,
       nadaBottlesRemaining: settings.nada.maxPerDay - nadaCount,
+      maxResults: MAX_RECOMMENDATIONS,
     });
   }, [settings, targets, eaten, nadaFood, nadaCount, filter]);
 
@@ -325,7 +328,7 @@ export default function HomePage() {
 
   function openResults() {
     setShowResults(true);
-    setShowAll(false);
+    setShown(PAGE);
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
@@ -792,7 +795,7 @@ export default function HomePage() {
                       key={f}
                       onClick={() => {
                         setFilter(f);
-                        setShowAll(false);
+                        setShown(PAGE);
                       }}
                       className={`relative py-2 text-xs font-bold transition-colors ${filter === f ? "text-black" : "text-muted"}`}
                     >
@@ -828,11 +831,11 @@ export default function HomePage() {
                   <LayoutGroup>
                     <div className="space-y-3">
                       <AnimatePresence mode="popLayout">
-                        {recommendations.slice(0, showAll ? undefined : 5).map((combo, i) => (
+                        {recommendations.slice(0, shown).map((combo, i) => (
                           <RecommendationCard
                             key={`${filter}:${combinationKey(combo)}`}
                             combo={combo}
-                            index={showAll && i >= 5 ? i - 5 : i}
+                            index={i >= PAGE ? (i % PAGE) : i}
                             proteinTarget={targets.proteinMin}
                             history={historyFor(combinationKey(combo))}
                             onSelect={() => selectCombination(combo)}
@@ -840,14 +843,25 @@ export default function HomePage() {
                         ))}
                       </AnimatePresence>
                     </div>
-                    {!showAll && recommendations.length > 5 && (
+                    {shown < recommendations.length ? (
                       <motion.button
                         whileTap={{ scale: 0.97 }}
-                        onClick={() => setShowAll(true)}
+                        onClick={() => setShown((n) => n + PAGE)}
                         className="mt-3 w-full rounded-2xl py-3.5 text-sm font-bold text-gold ring-1 ring-gold/30 bg-gold/5"
                       >
-                        {t(`Show ${recommendations.length - 5} more options ↓`, `اعرض ${recommendations.length - 5} خيارات زيادة ↓`)}
+                        {t(
+                          `More options (+${Math.min(PAGE, recommendations.length - shown)}) ↓`,
+                          `زيد خيارات (+${Math.min(PAGE, recommendations.length - shown)}) ↓`
+                        )}
                       </motion.button>
+                    ) : (
+                      shown > PAGE && (
+                        <p className="mt-3 text-center text-xs text-muted">
+                          {recommendations.length >= MAX_RECOMMENDATIONS
+                            ? t(`That's the limit — ${MAX_RECOMMENDATIONS} options.`, `هذا الحد — ${MAX_RECOMMENDATIONS} خيار.`)
+                            : t(`That's every option that fits (${recommendations.length}).`, `هذي كل الخيارات اللي تناسب (${recommendations.length}).`)}
+                        </p>
+                      )
                     )}
                   </LayoutGroup>
                 )}

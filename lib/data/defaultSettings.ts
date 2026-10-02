@@ -5,7 +5,7 @@ import { OFFICIAL_UAE_MENU } from "./officialMenu";
 /** Official McDonald's UAE values — see ./officialMenu.ts for where they come from. */
 export const defaultMcDonaldsFoods: FoodItem[] = OFFICIAL_UAE_MENU;
 
-export const SETTINGS_VERSION = 6;
+export const SETTINGS_VERSION = 7;
 
 export const defaultSettings: Settings = {
   version: SETTINGS_VERSION,
