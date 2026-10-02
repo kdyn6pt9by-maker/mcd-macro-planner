@@ -38,24 +38,30 @@ export function UpdateBanner() {
     };
   }, []);
 
+  // Centred by a plain wrapper: framer-motion owns the button's transform, so a -translate-x-1/2 on it gets
+  // overwritten and the pill used to sit right over the header's ⚙ 📊 📈 buttons. It lives at the bottom now.
   return (
-    <AnimatePresence>
-      {available && (
-        <motion.button
-          initial={{ y: -80, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -80, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 24 }}
-          onClick={reloadApp}
-          className="fixed left-1/2 -translate-x-1/2 z-[55] rounded-full bg-gold text-black font-extrabold text-sm px-5 py-2.5 shadow-[0_10px_30px_-8px_rgba(255,199,44,0.7)] flex items-center gap-2"
-          style={{ top: "max(0.75rem, env(safe-area-inset-top))" }}
-        >
-          <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}>
-            ↻
-          </motion.span>
-          {t("New version ready — tap to update", "في تحديث جديد — اضغط للتحديث")}
-        </motion.button>
-      )}
-    </AnimatePresence>
+    <div
+      className="fixed inset-x-0 z-[55] flex justify-center px-4 pointer-events-none"
+      style={{ bottom: "max(5.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))" }}
+    >
+      <AnimatePresence>
+        {available && (
+          <motion.button
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+            onClick={reloadApp}
+            className="pointer-events-auto rounded-full bg-gold text-black font-extrabold text-sm px-5 py-2.5 shadow-[0_10px_30px_-8px_rgba(255,199,44,0.7)] flex items-center gap-2"
+          >
+            <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}>
+              ↻
+            </motion.span>
+            {t("New version ready — tap to update", "في تحديث جديد — اضغط للتحديث")}
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
