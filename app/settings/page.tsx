@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { clearHistory, exportBackup, importBackup, listDays, loadSettings, requestPersistentStorage, saveSettings } from "@/lib/storage";
+import { ProductRef, clearHistory, exportBackup, importBackup, listDays, loadAllDays, loadHistory, loadSettings, requestPersistentStorage, saveSettings, updateProductEverywhere } from "@/lib/storage";
+import { Toast, ToastData } from "@/components/Toast";
 import { kcalFromMacros } from "@/lib/engine/macros";
-import { DayMode, FoodItem, Settings } from "@/lib/types";
+import { DayMode, FoodItem, Macros, Settings } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { GoalSection } from "@/components/GoalSection";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,6 +29,102 @@ function NumberField({
         className="w-24 bg-black/30 rounded-lg px-2 py-1 text-end text-sm border border-cardBorder"
       />
     </label>
+  );
+}
+
+const MACRO_KEYS = ["kcal", "protein", "fat", "carbs"] as const;
+const macrosOf = (m: Macros): Macros => ({ kcal: m.kcal, protein: m.protein, fat: m.fat, carbs: m.carbs });
+const sameMacros = (a: Macros, b: Macros) => MACRO_KEYS.every((k) => a[k] === b[k]);
+
+/** Save / cancel for a product whose fields are being edited; saving also rewrites every past day that has it. */
+function SaveBar({ dirty, onSave, onCancel }: { dirty: boolean; onSave: () => void; onCancel: () => void }) {
+  const { t } = useI18n();
+  return (
+    <AnimatePresence initial={false}>
+      {dirty && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          className="overflow-hidden"
+        >
+          <div className="flex gap-2 pt-2">
+            <button onClick={onSave} className="btn-tap flex-1 rounded-xl bg-gold text-ink py-2 text-sm font-black">
+              💾 {t("Save & update past days", "حفظ وتحديث الأيام السابقة")}
+            </button>
+            <button onClick={onCancel} className="btn-tap rounded-xl glass px-3 py-2 text-sm text-muted">
+              {t("Cancel", "إلغاء")}
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function FoodRow({
+  food,
+  onSave,
+  onToggle,
+  onDelete,
+}: {
+  food: FoodItem;
+  onSave: (macros: Macros) => void;
+  onToggle: (patch: Partial<FoodItem>) => void;
+  onDelete?: () => void;
+}) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState<Macros>(macrosOf(food.macros));
+  useEffect(() => setDraft(macrosOf(food.macros)), [food.macros]);
+  const dirty = !sameMacros(draft, food.macros);
+  return (
+    <div className={`border-b border-cardBorder/60 py-3 ${dirty ? "bg-gold/[0.04] -mx-2 px-2 rounded-xl" : ""}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-medium text-sm flex items-center gap-2">
+          {food.name}
+          {food.source?.startsWith("http") && (
+            <a href={food.source} target="_blank" rel="noreferrer" className="text-[10px] text-gold/80 underline">
+              {t("source", "المصدر")}
+            </a>
+          )}
+          {onDelete && (
+            <button onClick={onDelete} className="text-[10px] text-[#ff8a7d] underline">
+              {t("delete", "احذف")}
+            </button>
+          )}
+        </span>
+        <label className="flex items-center gap-2 text-xs text-muted">
+          <input type="checkbox" checked={food.enabled} onChange={(e) => onToggle({ enabled: e.target.checked })} />
+          {t("Enabled", "مفعّل")}
+        </label>
+      </div>
+      <div className="grid grid-cols-4 gap-2 mb-2">
+        {MACRO_KEYS.map((k) => (
+          <input
+            key={k}
+            type="number"
+            inputMode="decimal"
+            value={draft[k]}
+            placeholder={k}
+            onChange={(e) => setDraft({ ...draft, [k]: Number(e.target.value) })}
+            className={`bg-black/30 rounded-lg px-2 py-1 text-xs border ${draft[k] !== food.macros[k] ? "border-gold" : "border-cardBorder"}`}
+          />
+        ))}
+      </div>
+      <label className="flex items-center gap-2 text-xs">
+        <input
+          type="checkbox"
+          checked={food.verified}
+          onChange={(e) =>
+            onToggle({ verified: e.target.checked, lastVerified: e.target.checked ? new Date().toISOString().slice(0, 10) : undefined })
+          }
+        />
+        <span className={food.verified ? "text-success" : "text-red"}>
+          {food.verified ? t("Verified from official source", "موثّق من المصدر الرسمي") : t("Not verified — excluded from recommendations", "غير موثّق — ما يدخل التوصيات")}
+        </span>
+      </label>
+      <SaveBar dirty={dirty} onSave={() => onSave(draft)} onCancel={() => setDraft(macrosOf(food.macros))} />
+    </div>
   );
 }
 
@@ -174,9 +271,44 @@ export default function SettingsPage() {
     setSettings(loadSettings());
   }, []);
 
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const [nadaDraft, setNadaDraft] = useState<Settings["nada"] | null>(null);
+  const [usualDraft, setUsualDraft] = useState<Settings["usualMeal"] | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
   function update(next: Settings) {
     setSettings(next);
     saveSettings(next);
+  }
+
+  /** Saves new settings and, if a product's macros changed, rewrites it in every logged day (with undo). */
+  function saveProduct(next: Settings, ref: ProductRef | null, macros: Macros) {
+    const prevSettings = settings!;
+    const prevDays = JSON.stringify(loadAllDays());
+    const prevHistory = JSON.stringify(loadHistory());
+    update(next);
+    const res = ref ? updateProductEverywhere(ref, macros) : { entries: 0, days: 0 };
+    setToast({
+      id: Date.now(),
+      text: res.entries
+        ? t(`💾 Saved · updated ${res.entries} item${res.entries === 1 ? "" : "s"} in ${res.days} day${res.days === 1 ? "" : "s"}`, `💾 انحفظ · تحدّث ${res.entries} صنف في ${res.days} يوم`)
+        : t("💾 Saved", "💾 انحفظ"),
+      undo: () => {
+        update(prevSettings);
+        try {
+          window.localStorage.setItem("mcd-planner:days", prevDays);
+          window.localStorage.setItem("mcd-planner:history", prevHistory);
+        } catch {}
+        setNadaDraft(null);
+        setUsualDraft(null);
+        setToast(null);
+      },
+    });
   }
 
   if (!settings) return <div className="p-6 text-muted">{t("Loading…", "جاري التحميل…")}</div>;
@@ -285,20 +417,53 @@ export default function SettingsPage() {
 
       <section className="rounded-xl3 glass p-4 mb-4">
         <h2 className="font-semibold mb-2">🥛 {t("Nada Protein Milk", "حليب ندى بروتين")}</h2>
-        <NumberField label={t("Calories / bottle", "سعرات / علبة")} value={settings.nada.kcal} onChange={(v) => update({ ...settings, nada: { ...settings.nada, kcal: v } })} />
-        <NumberField label={t("Protein (g)", "بروتين (جرام)")} value={settings.nada.protein} onChange={(v) => update({ ...settings, nada: { ...settings.nada, protein: v } })} />
-        <NumberField label={t("Fat (g)", "دهون (جرام)")} value={settings.nada.fat} onChange={(v) => update({ ...settings, nada: { ...settings.nada, fat: v } })} />
-        <NumberField label={t("Carbs (g)", "كارب (جرام)")} value={settings.nada.carbs} onChange={(v) => update({ ...settings, nada: { ...settings.nada, carbs: v } })} />
-        <NumberField label={t("Max bottles/day", "أقصى علب/يوم")} value={settings.nada.maxPerDay} onChange={(v) => update({ ...settings, nada: { ...settings.nada, maxPerDay: v } })} />
-        <NumberField label={t("Price / bottle (AED)", "السعر / علبة (درهم)")} value={settings.nada.price} onChange={(v) => update({ ...settings, nada: { ...settings.nada, price: v } })} />
+        {(() => {
+          const n = nadaDraft ?? settings.nada;
+          const set = (patch: Partial<Settings["nada"]>) => setNadaDraft({ ...n, ...patch });
+          return (
+            <>
+              <NumberField label={t("Calories / bottle", "سعرات / علبة")} value={n.kcal} onChange={(v) => set({ kcal: v })} />
+              <NumberField label={t("Protein (g)", "بروتين (جرام)")} value={n.protein} onChange={(v) => set({ protein: v })} />
+              <NumberField label={t("Fat (g)", "دهون (جرام)")} value={n.fat} onChange={(v) => set({ fat: v })} />
+              <NumberField label={t("Carbs (g)", "كارب (جرام)")} value={n.carbs} onChange={(v) => set({ carbs: v })} />
+              <NumberField label={t("Max bottles/day", "أقصى علب/يوم")} value={n.maxPerDay} onChange={(v) => set({ maxPerDay: v })} />
+              <NumberField label={t("Price / bottle (AED)", "السعر / علبة (درهم)")} value={n.price} onChange={(v) => set({ price: v })} />
+              <SaveBar
+                dirty={!!nadaDraft && JSON.stringify(nadaDraft) !== JSON.stringify(settings.nada)}
+                onCancel={() => setNadaDraft(null)}
+                onSave={() => {
+                  const macrosChanged = !sameMacros(n, settings.nada);
+                  saveProduct({ ...settings, nada: n }, macrosChanged ? { kind: "nada" } : null, macrosOf(n));
+                  setNadaDraft(null);
+                }}
+              />
+            </>
+          );
+        })()}
       </section>
 
       <section className="rounded-xl3 glass p-4 mb-4">
         <h2 className="font-semibold mb-2">🥣 {t("Usual Meal", "الوجبة المعتادة")}</h2>
-        <NumberField label={t("Calories", "السعرات")} value={settings.usualMeal.kcal} onChange={(v) => update({ ...settings, usualMeal: { ...settings.usualMeal, kcal: v } })} />
-        <NumberField label={t("Protein (g)", "بروتين (جرام)")} value={settings.usualMeal.protein} onChange={(v) => update({ ...settings, usualMeal: { ...settings.usualMeal, protein: v } })} />
-        <NumberField label={t("Fat (g)", "دهون (جرام)")} value={settings.usualMeal.fat} onChange={(v) => update({ ...settings, usualMeal: { ...settings.usualMeal, fat: v } })} />
-        <NumberField label={t("Carbs (g)", "كارب (جرام)")} value={settings.usualMeal.carbs} onChange={(v) => update({ ...settings, usualMeal: { ...settings.usualMeal, carbs: v } })} />
+        {(() => {
+          const u = usualDraft ?? settings.usualMeal;
+          const set = (patch: Partial<Settings["usualMeal"]>) => setUsualDraft({ ...u, ...patch });
+          return (
+            <>
+              <NumberField label={t("Calories", "السعرات")} value={u.kcal} onChange={(v) => set({ kcal: v })} />
+              <NumberField label={t("Protein (g)", "بروتين (جرام)")} value={u.protein} onChange={(v) => set({ protein: v })} />
+              <NumberField label={t("Fat (g)", "دهون (جرام)")} value={u.fat} onChange={(v) => set({ fat: v })} />
+              <NumberField label={t("Carbs (g)", "كارب (جرام)")} value={u.carbs} onChange={(v) => set({ carbs: v })} />
+              <SaveBar
+                dirty={!!usualDraft && !sameMacros(usualDraft, settings.usualMeal)}
+                onCancel={() => setUsualDraft(null)}
+                onSave={() => {
+                  saveProduct({ ...settings, usualMeal: u }, { kind: "usual" }, macrosOf(u));
+                  setUsualDraft(null);
+                }}
+              />
+            </>
+          );
+        })()}
       </section>
 
       <section className="rounded-xl3 glass p-4 mb-4">
@@ -316,72 +481,21 @@ export default function SettingsPage() {
           <span>carbs</span>
         </div>
         {settings.foods.map((food, idx) => (
-          <div key={food.id} className="border-b border-cardBorder/60 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-sm flex items-center gap-2">
-                {food.name}
-                {food.source?.startsWith("http") && (
-                  <a href={food.source} target="_blank" rel="noreferrer" className="text-[10px] text-gold/80 underline">
-                    {t("source", "المصدر")}
-                  </a>
-                )}
-                {food.id.startsWith("custom-") && (
-                  <button
-                    onClick={() => update({ ...settings, foods: settings.foods.filter((f) => f.id !== food.id) })}
-                    className="text-[10px] text-[#ff8a7d] underline"
-                  >
-                    {t("delete", "احذف")}
-                  </button>
-                )}
-              </span>
-              <label className="flex items-center gap-2 text-xs text-muted">
-                <input
-                  type="checkbox"
-                  checked={food.enabled}
-                  onChange={(e) => {
-                    const foods = [...settings.foods];
-                    foods[idx] = { ...food, enabled: e.target.checked };
-                    update({ ...settings, foods });
-                  }}
-                />
-                {t("Enabled", "مفعّل")}
-              </label>
-            </div>
-            <div className="grid grid-cols-4 gap-2 mb-2">
-              {(["kcal", "protein", "fat", "carbs"] as const).map((k) => (
-                <input
-                  key={k}
-                  type="number"
-                  value={food.macros[k]}
-                  placeholder={k}
-                  onChange={(e) => {
-                    const foods = [...settings.foods];
-                    foods[idx] = { ...food, macros: { ...food.macros, [k]: Number(e.target.value) } };
-                    update({ ...settings, foods });
-                  }}
-                  className="bg-black/30 rounded-lg px-2 py-1 text-xs border border-cardBorder"
-                />
-              ))}
-            </div>
-            <label className="flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={food.verified}
-                onChange={(e) => {
-                  const foods = [...settings.foods];
-                  foods[idx] = {
-                    ...food,
-                    verified: e.target.checked,
-                    lastVerified: e.target.checked ? new Date().toISOString().slice(0, 10) : undefined,
-                  };
-                  update({ ...settings, foods });
-                }}
-              />
-              <span className={food.verified ? "text-success" : "text-red"}>
-                {food.verified ? t("Verified from official source", "موثّق من المصدر الرسمي") : t("Not verified — excluded from recommendations", "غير موثّق — ما يدخل التوصيات")}
-              </span>
-            </label>
-          </div>
+          <FoodRow
+            key={food.id}
+            food={food}
+            onToggle={(patch) => {
+              const foods = [...settings.foods];
+              foods[idx] = { ...food, ...patch };
+              update({ ...settings, foods });
+            }}
+            onDelete={food.id.startsWith("custom-") ? () => update({ ...settings, foods: settings.foods.filter((f) => f.id !== food.id) }) : undefined}
+            onSave={(macros) => {
+              const foods = [...settings.foods];
+              foods[idx] = { ...food, macros };
+              saveProduct({ ...settings, foods }, { kind: "mcdonalds", id: food.id, name: food.name }, macros);
+            }}
+          />
         ))}
         <AddItemForm
           onAdd={(food) => update({ ...settings, foods: [...settings.foods, food] })}
@@ -404,6 +518,7 @@ export default function SettingsPage() {
       <footer className="text-center text-[12px] text-muted/80 mt-8 font-bold">
         {t("Made by", "صُنع بواسطة")} <span className="gold-text">Mohammad Almansoori</span>
       </footer>
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </main>
   );
 }

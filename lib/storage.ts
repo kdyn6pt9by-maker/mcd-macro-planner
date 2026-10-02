@@ -304,3 +304,46 @@ export function loadBarcodeCache(): Record<string, import("./barcode").ScannedPr
 export function saveBarcodeProduct(p: import("./barcode").ScannedProduct) {
   safeSet(BARCODES_KEY, { ...loadBarcodeCache(), [p.code]: p });
 }
+
+export type ProductRef = { kind: "mcdonalds"; id: string; name: string } | { kind: "nada" } | { kind: "usual" };
+
+/**
+ * Rewrites the macros of every logged entry of one product (all past days) and the order snapshots in history.
+ * McDonald's entries are one per item, matched by name; Nada entries are one bottle; usual meal by kind.
+ */
+export function updateProductEverywhere(ref: ProductRef, macros: Macros): { entries: number; days: number } {
+  const days = loadAllDays();
+  let entries = 0;
+  let touchedDays = 0;
+  const same = (a: Macros, b: Macros) => a.kcal === b.kcal && a.protein === b.protein && a.fat === b.fat && a.carbs === b.carbs;
+  for (const [date, day] of Object.entries(days)) {
+    if (!Array.isArray(day.entries)) continue;
+    let touched = false;
+    day.entries = day.entries.map((e) => {
+      const match = ref.kind === "mcdonalds" ? e.kind === "mcdonalds" && e.label === ref.name : e.kind === ref.kind;
+      if (!match || same(e.macros, macros)) return e;
+      entries++;
+      touched = true;
+      return { ...e, macros: { ...macros } };
+    });
+    if (touched) {
+      touchedDays++;
+      days[date] = day;
+    }
+  }
+  if (touchedDays) safeSet(DAYS_KEY, days);
+
+  if (ref.kind !== "usual") {
+    const itemId = ref.kind === "nada" ? "nada" : ref.id;
+    const history = loadHistory();
+    let changed = false;
+    for (const h of history)
+      for (const it of h.items ?? [])
+        if (it.id === itemId && !same(it.macros, macros)) {
+          it.macros = { ...macros };
+          changed = true;
+        }
+    if (changed) safeSet(HISTORY_KEY, history);
+  }
+  return { entries, days: touchedDays };
+}

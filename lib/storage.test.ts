@@ -170,3 +170,33 @@ describe("history / favorites logic", () => {
     expect(loadHistory()).toEqual([]);
   });
 });
+
+describe("updateProductEverywhere", () => {
+  const mk = (id: string, kind: "mcdonalds" | "nada" | "usual" | "custom", label: string, kcal: number) => ({
+    id,
+    kind,
+    label,
+    macros: { kcal, protein: 1, fat: 1, carbs: 1 },
+    at: "",
+  });
+
+  it("rewrites every past entry of a McDonald's item, leaving others alone", async () => {
+    const { saveDay, loadDay, updateProductEverywhere, recordCombinationUsed, loadHistory } = await import("./storage");
+    saveDay({ date: "2026-09-01", entries: [mk("a", "mcdonalds", "Big Mac", 549), mk("b", "mcdonalds", "McChicken", 448), mk("c", "custom", "Big Mac", 600)] });
+    saveDay({ date: "2026-09-02", entries: [mk("d", "mcdonalds", "Big Mac", 549), mk("e", "mcdonalds", "Big Mac", 549)] });
+    recordCombinationUsed("big-macx2", "2 × Big Mac", [{ id: "big-mac", name: "Big Mac", qty: 2, macros: { kcal: 549, protein: 23, fat: 30, carbs: 46 } }]);
+    const m = { kcal: 560, protein: 25, fat: 31, carbs: 45 };
+    expect(updateProductEverywhere({ kind: "mcdonalds", id: "big-mac", name: "Big Mac" }, m)).toEqual({ entries: 3, days: 2 });
+    expect(loadDay("2026-09-01").entries.map((e) => e.macros.kcal)).toEqual([560, 448, 600]);
+    expect(loadDay("2026-09-02").entries.every((e) => e.macros.kcal === 560)).toBe(true);
+    expect(loadHistory()[0].items![0].macros).toEqual(m);
+  });
+
+  it("updates Nada bottles and the usual meal by kind", async () => {
+    const { saveDay, loadDay, updateProductEverywhere } = await import("./storage");
+    saveDay({ date: "2026-09-03", entries: [mk("n", "nada", "Nada Protein Milk", 278.4), mk("u", "usual", "Rice Krispies", 329)] });
+    updateProductEverywhere({ kind: "nada" }, { kcal: 280, protein: 31, fat: 0.2, carbs: 32 });
+    updateProductEverywhere({ kind: "usual" }, { kcal: 340, protein: 18, fat: 3, carbs: 57 });
+    expect(loadDay("2026-09-03").entries.map((e) => e.macros.kcal)).toEqual([280, 340]);
+  });
+});
