@@ -1,5 +1,6 @@
 import { DayMode, DayState, FoodItem, Macros, Settings } from "./types";
 import { SETTINGS_VERSION, defaultSettings } from "./data/defaultSettings";
+import { applyOfficialMenu } from "./data/officialMenu";
 import type { WeightEntry } from "./progress";
 
 const SETTINGS_KEY = "mcd-planner:settings";
@@ -74,12 +75,26 @@ export function migrateSettings(stored: Partial<Settings> | null): Settings {
     const have = new Set(merged.foods.map((f) => f.id));
     merged.foods = [...merged.foods, ...defaultSettings.foods.filter((f) => !have.has(f.id))];
   }
+  if (merged.version < 6) {
+    // v6: official McDonald's UAE numbers for every known item, new items added, wings removed.
+    merged.foods = applyOfficialMenu(merged.foods);
+  }
   merged.version = SETTINGS_VERSION;
   return merged;
 }
 
 export function loadSettings(): Settings {
-  return migrateSettings(safeGet<Partial<Settings> | null>(SETTINGS_KEY, null));
+  const stored = safeGet<Partial<Settings> | null>(SETTINGS_KEY, null);
+  const settings = migrateSettings(stored);
+  if (stored && (stored.version ?? 1) < 6) {
+    // The official menu update also rewrites past days, matched by the name each item was logged under.
+    for (const before of stored.foods ?? []) {
+      const after = settings.foods.find((f) => f.id === before.id) ?? settings.foods.find((f) => f.name === before.name);
+      if (after && before.category === "mcdonalds") updateProductEverywhere({ kind: "mcdonalds", id: after.id, name: before.name }, after.macros);
+    }
+    saveSettings(settings);
+  }
+  return settings;
 }
 
 export function saveSettings(settings: Settings) {

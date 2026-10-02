@@ -25,7 +25,7 @@ describe("settings migration", () => {
     const v1 = { ...defaultSettings, version: undefined, nada: { ...defaultSettings.nada, maxPerDay: 3 } };
     const migrated = migrateSettings(v1 as never);
     expect(migrated.nada.maxPerDay).toBe(4);
-    expect(migrated.version).toBe(5);
+    expect(migrated.version).toBe(6);
     expect(migrated.foods.some((f) => f.id === "ice-cream-cone")).toBe(true);
     expect(migrated.goal).toEqual({ mode: "maintain", pct: 20 });
     expect(migrated.savedMeals).toEqual([]);
@@ -111,7 +111,7 @@ describe("order details", () => {
     recordCombinationUsed("big-macx2|nadax1", "2 × Big Mac + 1 × Nada");
     const items = orderItems(loadHistory()[0], defaultSettings.foods, defaultSettings.nada);
     expect(items.map((i) => [i.id, i.qty, i.macros.kcal])).toEqual([
-      ["big-mac", 2, 549],
+      ["big-mac", 2, 564],
       ["nada", 1, 278.4],
     ]);
     deleteHistoryEntry("big-macx2|nadax1");
@@ -199,5 +199,35 @@ describe("updateProductEverywhere", () => {
     updateProductEverywhere({ kind: "nada" }, { kcal: 280, protein: 31, fat: 0.2, carbs: 32 });
     updateProductEverywhere({ kind: "usual" }, { kcal: 340, protein: 18, fat: 3, carbs: 57 });
     expect(loadDay("2026-09-03").entries.map((e) => e.macros.kcal)).toEqual([280, 340]);
+  });
+});
+
+describe("official McDonald's UAE menu (v6)", () => {
+  it("overwrites edited numbers, dedupes self-added items, drops wings, adds new items", async () => {
+    const { applyOfficialMenu } = await import("./data/officialMenu");
+    const foods = applyOfficialMenu([
+      { id: "big-mac", name: "Big Mac", category: "mcdonalds", macros: { kcal: 600, protein: 25, fat: 31, carbs: 50 }, verified: true, enabled: false },
+      { id: "custom-a", name: "Chicken Tenders™", category: "mcdonalds", macros: { kcal: 300, protein: 20, fat: 12, carbs: 20 }, verified: true, enabled: true },
+      { id: "custom-b", name: "4 pcs Wings", category: "mcdonalds", macros: { kcal: 435, protein: 26, fat: 26, carbs: 25 }, verified: true, enabled: true },
+      { id: "custom-c", name: "My wrap", category: "mcdonalds", macros: { kcal: 400, protein: 30, fat: 10, carbs: 40 }, verified: true, enabled: true },
+    ]);
+    const get = (id: string) => foods.find((f) => f.id === id);
+    expect(get("big-mac")?.macros).toEqual({ kcal: 564, protein: 23, fat: 30, carbs: 46 });
+    expect(get("big-mac")?.enabled).toBe(false); // your on/off choice is kept
+    expect(get("custom-a")?.macros.kcal).toBe(245);
+    expect(foods.filter((f) => /tender/i.test(f.name))).toHaveLength(1);
+    expect(foods.some((f) => /wing/i.test(f.name))).toBe(false);
+    expect(get("custom-c")?.macros.kcal).toBe(400);
+    expect(get("mccrispy")?.macros.kcal).toBe(619);
+  });
+
+  it("rewrites past days logged with the old numbers when settings load", async () => {
+    const { saveDay, loadDay, loadSettings } = await import("./storage");
+    const { defaultSettings } = await import("./data/defaultSettings");
+    const old = { ...defaultSettings, version: 5, foods: [{ id: "big-mac", name: "Big Mac", category: "mcdonalds" as const, macros: { kcal: 549, protein: 23, fat: 30, carbs: 46 }, verified: true, enabled: true }] };
+    window.localStorage.setItem("mcd-planner:settings", JSON.stringify(old));
+    saveDay({ date: "2026-09-20", entries: [{ id: "x", kind: "mcdonalds", label: "Big Mac", macros: { kcal: 549, protein: 23, fat: 30, carbs: 46 }, at: "" }] });
+    expect(loadSettings().version).toBe(6);
+    expect(loadDay("2026-09-20").entries[0].macros.kcal).toBe(564);
   });
 });
