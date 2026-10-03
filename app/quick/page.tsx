@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PayFlags, PayRequest, PaySheet } from "@/components/PaySheet";
 import { roundMacros, sumMacros } from "@/lib/engine/macros";
 import { isBreakfast } from "@/lib/foodGroups";
-import { combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
+import { byFitThenKcal, combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
 import { useI18n } from "@/lib/i18n";
 import { recentAmounts } from "@/lib/insights";
 import { historyFor, listDays, loadDay, loadMode, loadSettings, recordCombinationUsed, saveDay } from "@/lib/storage";
@@ -52,7 +52,7 @@ export default function QuickPage() {
       nadaItem: nada,
       nadaBottlesRemaining: settings.nada.maxPerDay - day.entries.filter((e) => e.kind === "nada").length,
       maxResults: 3,
-    }).sort((a, b) => b.totals.kcal - a.totals.kcal);
+    }).sort(byFitThenKcal);
   }, [settings, day, eaten]);
 
   function eat(c: Combination) {
@@ -99,7 +99,7 @@ export default function QuickPage() {
   const r = roundMacros(eaten);
 
   return (
-    <main className="max-w-md mx-auto px-4 pb-10 min-h-screen flex flex-col" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
+    <main className="max-w-md mx-auto px-4 pb-10 min-h-screen flex flex-col" style={{ paddingTop: "calc(env(safe-area-inset-top) + 1rem)" }}>
       <DayBarLive />
       <header className="flex items-center justify-between mb-4">
         <Link href="/" className="h-12 w-12 rounded-2xl glass flex items-center justify-center text-xl text-muted" aria-label={t("Back", "رجوع")}>

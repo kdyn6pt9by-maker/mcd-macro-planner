@@ -170,7 +170,7 @@ export default function ProgressPage() {
   }
 
   return (
-    <main className="max-w-md mx-auto px-4 pb-24" style={{ paddingTop: "max(1.25rem, env(safe-area-inset-top))" }}>
+    <main className="max-w-md mx-auto px-4 pb-24" style={{ paddingTop: "calc(env(safe-area-inset-top) + 1rem)" }}>
       <DayBarLive />
       <ProgressTabs />
       <header className="flex items-center gap-3 mb-6">

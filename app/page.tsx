@@ -38,7 +38,7 @@ import { UpdateBanner, isUpdateAvailable, reloadApp } from "@/components/UpdateB
 import { WeekendCheckIn } from "@/components/WeekendCheckIn";
 import { smartAdvice } from "@/lib/engine/advice";
 import { roundMacros, scaleMacros, sumMacros } from "@/lib/engine/macros";
-import { MAX_RECOMMENDATIONS, combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
+import { MAX_RECOMMENDATIONS, byFitThenKcal, combinationKey, combinationLabel, findRecommendations } from "@/lib/engine/optimizer";
 import { useI18n } from "@/lib/i18n";
 import { isBreakfast } from "@/lib/foodGroups";
 import { cloneEntries, costSummary, prunePayments, recentAmounts } from "@/lib/insights";
@@ -239,7 +239,8 @@ function HomeScreen() {
     [settings]
   );
 
-  const recommendations = useMemo<Combination[]>(() => {
+  // Best-first by the optimizer (protein, calories, fat) — used for "Finish my day".
+  const ranked = useMemo<Combination[]>(() => {
     if (!settings || !targets) return [];
     return findRecommendations({
       eaten,
@@ -252,8 +253,10 @@ function HomeScreen() {
       nadaBottlesRemaining: settings.nada.maxPerDay - nadaCount,
       maxResults: MAX_RECOMMENDATIONS,
       // Shown from most to fewest calories (labels like BEST MATCH stay on their order).
-    }).sort((a, b) => b.totals.kcal - a.totals.kcal);
+    });
   }, [settings, targets, eaten, nadaFood, nadaCount, filter]);
+  // The McD list is shown within-calories first, most calories first.
+  const recommendations = useMemo(() => [...ranked].sort(byFitThenKcal), [ranked]);
 
   const dayName = (date: string) =>
     date === todayKey()
@@ -383,6 +386,22 @@ function HomeScreen() {
     showToast(t(`💰 ${amount} AED saved`, `💰 انحفظ ${amount} درهم`));
   }
 
+  /** Plain reason when no McDonald's order fits what's left. */
+  function noFitReason(): string {
+    if (!settings || !targets) return "";
+    const kcalLeft = Math.round(targets.kcal - eaten.kcal);
+    const fatLeft = Math.round((targets.fatMax - eaten.fat) * 10) / 10;
+    const pool = settings.foods.filter((f) => f.enabled && f.verified);
+    const smallestKcal = Math.min(...pool.map((f) => f.macros.kcal));
+    const smallestFat = Math.min(...pool.map((f) => f.macros.fat));
+    if (kcalLeft <= 0) return t("You've reached your calories for today.", "وصلت سعراتك لليوم.");
+    if (kcalLeft + 50 < smallestKcal)
+      return t(`Only ${kcalLeft} kcal left — the smallest item is ${Math.round(smallestKcal)} kcal.`, `باقي لك ${kcalLeft} سعرة بس — أصغر صنف ${Math.round(smallestKcal)} سعرة.`);
+    if (fatLeft < smallestFat)
+      return t(`Only ${fatLeft}g fat left — every McDonald's item has more.`, `باقي لك ${fatLeft} جرام دهون بس — كل أصناف ماك فيها أكثر.`);
+    return t("Nothing on the menu fits what's left.", "ما في شي في المنيو يناسب اللي باقي.");
+  }
+
   function selectCombination(combo: Combination) {
     logOrder(
       todayKey(),
@@ -416,7 +435,7 @@ function HomeScreen() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <main className="max-w-md mx-auto px-4 pb-28" style={{ paddingTop: "max(1.25rem, env(safe-area-inset-top))" }}>
+      <main className="max-w-md mx-auto px-4 pb-28" style={{ paddingTop: "calc(env(safe-area-inset-top) + 1rem)" }}>
         {tab === "today" && (
           <>
         {/* Header */}
@@ -692,7 +711,8 @@ function HomeScreen() {
                 </div>
                 {recommendations.length === 0 ? (
                   <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-xl3 p-5">
-                    <p className="font-bold mb-3">{t("No exact McDonald's combination fits.", "ما في طلب من ماك يناسب بالضبط.")}</p>
+                    <p className="font-bold mb-1">{t("No McDonald's order fits.", "ما في طلب من ماك يناسب.")}</p>
+                    <p className="text-sm text-muted mb-3">{noFitReason()}</p>
                     <p className="text-xs text-muted mb-2">{t("Remaining:", "الباقي:")}</p>
                     <div className="grid grid-cols-4 gap-2 text-center">
                       {[
@@ -805,6 +825,48 @@ function HomeScreen() {
           <h1 className="text-2xl font-black tracking-tight">➕ {t("Log food", "سجّل أكلك")}</h1>
           <p className="text-xs text-muted mt-0.5">{t("Usual meal, Nada, McDonald's, anything else — today or a past day.", "وجبتك المعتادة، ندى، ماك، أو أي شي ثاني — لليوم أو ليوم فات.")}</p>
         </motion.header>
+
+        {/* Finish my day: the closest orders for what's left, or pick yourself */}
+        <section className="mb-4 rounded-2xl p-4 ring-1 ring-gold/25" style={{ background: "linear-gradient(135deg,rgba(255,199,44,0.10),rgba(24,8,10,0.85) 70%)" }}>
+          <div className="flex items-center justify-between">
+            <h2 className="font-black">🎯 {t("Finish my day", "كمّل باقي يومي")}</h2>
+            <span className="text-xs text-muted">
+              {t(`${Math.max(0, Math.round(targets.kcal - eaten.kcal))} kcal left`, `باقي ${Math.max(0, Math.round(targets.kcal - eaten.kcal))} سعرة`)}
+            </span>
+          </div>
+          {recommendations.length === 0 ? (
+            <p className="text-sm text-muted mt-2">{noFitReason()}</p>
+          ) : (
+            <div className="mt-2.5 space-y-2">
+              {ranked.slice(0, 3).map((combo) => (
+                <div key={combinationKey(combo)} className="flex items-center gap-2 rounded-xl bg-black/30 ps-3 pe-1.5 py-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold truncate">{combinationLabel(combo)}</div>
+                    <div className="text-[11px] text-muted">
+                      +{combo.totals.kcal} kcal · +{combo.totals.protein}g P ·{" "}
+                      {combo.remainingKcal >= 0 ? t(`${combo.remainingKcal} left after`, `يبقى ${combo.remainingKcal}`) : t(`${-combo.remainingKcal} over`, `زايد ${-combo.remainingKcal}`)}
+                    </div>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => selectCombination(combo)}
+                    className="shrink-0 rounded-xl bg-gold text-black text-xs font-extrabold px-3 py-2"
+                  >
+                    {t("+ Add", "+ أضف")}
+                  </motion.button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <Link href="/?tab=mcd" className="rounded-xl py-2.5 text-center text-xs font-bold text-gold ring-1 ring-gold/30 bg-gold/5">
+              {t("More options →", "خيارات أكثر ←")}
+            </Link>
+            <button onClick={() => setMenuOpen(true)} className="rounded-xl py-2.5 text-center text-xs font-bold bg-white/[0.06] ring-1 ring-white/10">
+              🍟 {t("I'll pick myself", "باختار بنفسي")}
+            </button>
+          </div>
+        </section>
         {/* Copy yesterday */}
         <AnimatePresence>
           {day.entries.length === 0 && !!yesterday?.entries.length && (

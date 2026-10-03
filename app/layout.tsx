@@ -34,6 +34,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="min-h-screen antialiased font-sans">
         <div className="ambient" aria-hidden />
+        {/* Solid strip behind the iPhone status bar so scrolled content never runs under the clock/battery. */}
+        <div className="fixed inset-x-0 top-0 z-[35] bg-[#0b0405]" style={{ height: "env(safe-area-inset-top)" }} aria-hidden />
         <div className="relative z-10" style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}>
           <LanguageProvider>
             {children}

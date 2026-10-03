@@ -135,3 +135,12 @@ describe("show more", () => {
     expect(many.every((c) => c.remainingKcal >= -KCAL_OVER_ALLOWANCE)).toBe(true);
   });
 });
+
+describe("display order", () => {
+  it("puts orders within calories first, most calories first", async () => {
+    const { byFitThenKcal } = await import("./optimizer");
+    const c = (kcal: number, remainingKcal: number) => ({ totals: { kcal }, remainingKcal }) as never;
+    const sorted = [c(540, -40), c(480, 20), c(300, 200), c(520, -20)].sort(byFitThenKcal);
+    expect(sorted.map((x: { totals: { kcal: number } }) => x.totals.kcal)).toEqual([480, 300, 540, 520]);
+  });
+});

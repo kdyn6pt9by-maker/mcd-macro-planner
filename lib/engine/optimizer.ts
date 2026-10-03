@@ -225,6 +225,13 @@ function labelCombinations(sorted: Combination[]): Combination[] {
   return result;
 }
 
+/** Display order: orders that stay within your calories first, then the slight overs; each group most-calories-first. */
+export function byFitThenKcal(a: Combination, b: Combination): number {
+  const overA = a.remainingKcal < 0 ? 1 : 0;
+  const overB = b.remainingKcal < 0 ? 1 : 0;
+  return overA - overB || b.totals.kcal - a.totals.kcal;
+}
+
 export function combinationLabel(c: Combination): string {
   return comboLabel(c.items);
 }

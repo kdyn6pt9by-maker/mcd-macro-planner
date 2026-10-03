@@ -12,8 +12,8 @@ import { Macros, Targets } from "@/lib/types";
 import { AnimatedNumber } from "./AnimatedNumber";
 
 /**
- * Today's calories, pinned to the top of every page (except settings). It cancels the page's top padding
- * so it sits flush under the status bar, and tapping it goes to Today.
+ * Today's calories, pinned to the top of every page (except settings), just under the iPhone status bar.
+ * Tapping it goes to Today.
  */
 export function DayBar({ eaten, targets }: { eaten: Macros; targets: Targets }) {
   const { t } = useI18n();
@@ -24,8 +24,8 @@ export function DayBar({ eaten, targets }: { eaten: Macros; targets: Targets }) 
 
   return (
     <div
-      className="sticky top-0 z-20 -mx-4 px-4 pb-2 mb-3 bg-[#0b0405]/80 backdrop-blur-xl"
-      style={{ marginTop: "calc(-1 * max(1.25rem, env(safe-area-inset-top)))", paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+      className="sticky z-20 -mx-4 px-4 pt-2 pb-2 mb-3 bg-[#0b0405]/90 backdrop-blur-xl"
+      style={{ top: "env(safe-area-inset-top)", marginTop: "-1rem" }}
     >
       <Link href="/" className="block rounded-2xl glass px-3.5 py-2.5">
         <div className="flex items-center gap-2 text-sm">
