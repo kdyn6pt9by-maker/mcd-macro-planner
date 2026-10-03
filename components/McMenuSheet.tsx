@@ -106,9 +106,41 @@ export function McMenuSheet({ open, initialDate, initialQty, onClose, foods, eat
               <h2 className="text-xl font-black">
                                 <span className="gold-text">{t("Build", "رتّب")}</span> {t("your McDonald's order", "طلبك من ماكدونالدز")}
               </h2>
-              <p className="text-xs text-muted mt-0.5">
-                {t("Pick exactly what you want — see the impact before you add it.", "اختار اللي تبيه بالضبط — وشوف تأثيره قبل ما تضيفه.")}
-              </p>
+            </div>
+
+            {/* Live running total: what you've picked, the day with it, and what's left. */}
+            <div className="shrink-0 px-5 pb-3">
+              <div className="grid grid-cols-3 gap-1.5 text-center">
+                <div className={`rounded-2xl py-2 ring-1 transition-colors ${itemCount > 0 ? "bg-gold/10 ring-gold/40" : "bg-white/[0.04] ring-white/5"}`}>
+                  <div className="text-[10px] text-muted">{t("You picked", "اخترت")}</div>
+                  <div className="text-lg font-black text-gold">
+                    <AnimatedNumber value={adds.kcal} />
+                  </div>
+                  <div className="text-[10px] text-muted">{t(`${itemCount} item${itemCount === 1 ? "" : "s"}`, `${itemCount} صنف`)}</div>
+                </div>
+                <div className="rounded-2xl py-2 bg-white/[0.04] ring-1 ring-white/5">
+                  <div className="text-[10px] text-muted">{isToday ? t("Day total", "مجموع اليوم") : t("That day", "مجموع ذاك اليوم")}</div>
+                  <div className={`text-lg font-black ${kcalOver ? "text-[#ff8a7d]" : ""}`}>
+                    <AnimatedNumber value={after.kcal} />
+                  </div>
+                  <div className="text-[10px] text-muted">
+                    {Math.round(eaten.kcal)} + {Math.round(adds.kcal)}
+                  </div>
+                </div>
+                <div className={`rounded-2xl py-2 ring-1 ${kcalOver ? "bg-red/15 ring-red/40" : "bg-success/10 ring-success/30"}`}>
+                  <div className="text-[10px] text-muted">{kcalOver ? t("Over by", "زايد") : t("Left", "باقي لك")}</div>
+                  <div className={`text-lg font-black ${kcalOver ? "text-[#ff8a7d]" : "text-success"}`}>
+                    <AnimatedNumber value={Math.abs(Math.round(targets.kcal - after.kcal))} />
+                  </div>
+                  <div className="text-[10px] text-muted">{t(`of ${targets.kcal}`, `من ${targets.kcal}`)}</div>
+                </div>
+              </div>
+              <div className="mt-1.5 text-center text-[11px] text-muted">
+                <span className={proteinHit ? "text-success font-bold" : ""}>
+                  {t("Protein", "بروتين")} {after.protein}/{targets.proteinMin}g{proteinHit ? " ✓" : ""}
+                </span>{" "}
+                · <span className={fatOver ? "text-[#ff8a7d] font-bold" : ""}>{t("Fat", "دهون")} {after.fat}/{targets.fatMax}g</span>
+              </div>
             </div>
 
             <div className="shrink-0 px-5 pb-3">
@@ -230,17 +262,6 @@ export function McMenuSheet({ open, initialDate, initialQty, onClose, foods, eat
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="text-xs text-muted mt-2.5 leading-5">
-                      {isToday ? t("Day after:", "يومك بعدها:") : t("That day after:", "ذاك اليوم بعدها:")}{" "}
-                      <span className={kcalOver ? "text-[#ff8a7d] font-bold" : "text-[#e8d5d6]"}>
-                        {after.kcal}/{targets.kcal} kcal
-                      </span>{" "}
-                      ·{" "}
-                      <span className={proteinHit ? "text-success font-bold" : ""}>
-                        {after.protein}g P{proteinHit ? " ✓" : ""}
-                      </span>{" "}
-                      · <span className={fatOver ? "text-[#ff8a7d] font-bold" : ""}>{after.fat}/{targets.fatMax}g F</span>
-                    </div>
                     {(fatOver || kcalOver) && (
                       <motion.div
                         initial={{ x: -6 }}
