@@ -24,15 +24,15 @@ export function DayBar({ eaten, targets }: { eaten: Macros; targets: Targets }) 
 
   return (
     <div
-      className="sticky z-20 -mx-4 px-4 pt-2 pb-2 mb-3 bg-[#0b0405]/90 backdrop-blur-xl"
-      style={{ top: "env(safe-area-inset-top)", marginTop: "-1rem" }}
+      className="sticky z-20 -mx-4 px-4 pt-3 pb-2 mb-3 bg-[#0b0405]"
+      style={{ top: "env(safe-area-inset-top)", marginTop: "-0.5rem" }}
     >
-      <Link href="/" className="block rounded-2xl glass px-3.5 py-2.5">
+      <Link href="/" className="block rounded-2xl px-3.5 py-2.5 bg-[#2a0d10] ring-1 ring-gold/15">
         <div className="flex items-center gap-2 text-sm">
           <span>🔥</span>
           <span className="font-black">
             <AnimatedNumber value={Math.round(eaten.kcal)} />
-            <span className="text-muted font-bold"> / {targets.kcal.toLocaleString("en-US")}</span>
+            <span className="text-[#e8d5d6] font-bold"> / {targets.kcal.toLocaleString("en-US")}</span>
           </span>
           <span className={`ms-auto text-xs font-black ${over ? "text-[#ff8a7d]" : "text-success"}`}>
             {over ? t(`${-left} over`, `زايد ${-left}`) : t(`${left} left`, `باقي ${left}`)}
@@ -46,7 +46,7 @@ export function DayBar({ eaten, targets }: { eaten: Macros; targets: Targets }) 
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
           />
         </div>
-        <div className="mt-1 flex gap-3 text-[10px] text-muted">
+        <div className="mt-1 flex gap-3 text-[11px] text-[#cbb5b7]">
           <span className={proteinHit ? "text-success font-bold" : ""}>
             P {Math.round(eaten.protein)}/{targets.proteinMin}
             {proteinHit ? " ✓" : ""}
