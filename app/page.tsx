@@ -20,7 +20,9 @@ import {
 } from "@/lib/reserve";
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "framer-motion";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { DayBar } from "@/components/DayBar";
 import { AddFoodSheet } from "@/components/AddFoodSheet";
 import { CalorieRing } from "@/components/CalorieRing";
 import { Celebration } from "@/components/Celebration";
@@ -80,7 +82,21 @@ function yesterdayKey() {
   return toKey(d);
 }
 
+type Tab = "today" | "mcd" | "log";
+
 export default function HomePage() {
+  // useSearchParams needs a Suspense boundary for static rendering.
+  return (
+    <Suspense>
+      <HomeScreen />
+    </Suspense>
+  );
+}
+
+function HomeScreen() {
+  const tabParam = useSearchParams().get("tab");
+  const tab: Tab = tabParam === "mcd" || tabParam === "log" ? tabParam : "today";
+  useEffect(() => window.scrollTo({ top: 0 }), [tab]);
   const { t, lang, date: fmtDate } = useI18n();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [mode, setMode] = useState<DayMode>("workday");
@@ -401,6 +417,8 @@ export default function HomePage() {
   return (
     <MotionConfig reducedMotion="user">
       <main className="max-w-md mx-auto px-4 pb-28" style={{ paddingTop: "max(1.25rem, env(safe-area-inset-top))" }}>
+        {tab === "today" && (
+          <>
         {/* Header */}
         <motion.header initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-5">
           <div dir="ltr" className={lang === "ar" ? "text-right" : ""}>
@@ -457,24 +475,6 @@ export default function HomePage() {
             >
               ↻
             </motion.button>
-            <Link href="/progress" aria-label={t("Progress", "التقدم")}>
-              <motion.div whileTap={{ scale: 0.9 }} className={iconBtn}>
-                📈
-              </motion.div>
-            </Link>
-            <Link href="/stats" aria-label={t("My stats", "إحصائياتي")}>
-              <motion.div whileTap={{ scale: 0.9 }} className={iconBtn}>
-                📊
-              </motion.div>
-            </Link>
-            <Link href="/settings" aria-label={t("Settings", "الإعدادات")}>
-              <motion.div whileTap={{ scale: 0.9, rotate: 60 }} className={iconBtn}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-              </motion.div>
-            </Link>
           </div>
         </motion.header>
 
@@ -517,28 +517,6 @@ export default function HomePage() {
           ))}
         </motion.div>
 
-        {bank && settings && (
-          <BankCard
-            bank={bank}
-            adjust={adjustOn}
-            choices={reserve.choices}
-            payback={reserve.paybacks[mondayOf(todayKey())]}
-            onToggle={toggleWeekend}
-          />
-        )}
-        {(reserveInfo.lines.length > 0 || reserveInfo.balance !== 0) && (
-          <ReserveCard
-            balance={reserveInfo.balance}
-            lines={reserveInfo.lines}
-            todayWithdrawn={adjust?.withdrawn ?? 0}
-            onWithdraw={(kcal) => {
-              updateReserve({ ...reserve, moves: [...reserve.moves, { id: uid(), date: todayKey(), kcal, kind: "withdraw" }] });
-              showToast(t(`🐷 +${kcal} kcal added to today`, `🐷 +${kcal} سعرة انضافت لليوم`));
-            }}
-            onRemove={(id) => updateReserve({ ...reserve, moves: reserve.moves.filter((m) => m.id !== id) })}
-          />
-        )}
-
         {/* Evening nudge: weekday after 7pm with protein still short */}
         {(() => {
           const now = new Date();
@@ -580,6 +558,253 @@ export default function HomePage() {
           </motion.div>
         </AnimatePresence>
 
+        {/* Today's log */}
+        {day.entries.length > 0 && (
+          <section className="mt-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-muted uppercase tracking-[0.16em]">{t("Today", "اليوم")}</h2>
+              <Link href="/stats?tab=days" className="text-xs font-bold text-gold">
+                {t("Past days →", "الأيام السابقة ←")}
+              </Link>
+            </div>
+            <DayLog
+              entries={day.entries}
+              payments={day.payments}
+              onRemoveEntry={removeEntry}
+              onRemoveGroup={removeGroup}
+              onEditOrder={(groupId) => setEditing({ date: day.date, groupId, qty: orderQty(day, groupId, settings.foods) })}
+              onEditPayment={(orderId, label) => {
+                const items = day.entries.filter((e) => e.groupId === orderId && e.kind === "mcdonalds");
+                setPay({
+                  date: day.date,
+                  orderId,
+                  label,
+                  kcal: sumMacros(items.map((e) => e.macros)).kcal,
+                  protein: items.reduce((n, e) => n + e.macros.protein, 0),
+                });
+              }}
+            />
+            <DayCostBar day={day} nadaPrice={settings.nada.price} />
+          </section>
+        )}
+
+        {bank && settings && (
+          <BankCard
+            bank={bank}
+            adjust={adjustOn}
+            choices={reserve.choices}
+            payback={reserve.paybacks[mondayOf(todayKey())]}
+            onToggle={toggleWeekend}
+          />
+        )}
+        {(reserveInfo.lines.length > 0 || reserveInfo.balance !== 0) && (
+          <ReserveCard
+            balance={reserveInfo.balance}
+            lines={reserveInfo.lines}
+            todayWithdrawn={adjust?.withdrawn ?? 0}
+            onWithdraw={(kcal) => {
+              updateReserve({ ...reserve, moves: [...reserve.moves, { id: uid(), date: todayKey(), kcal, kind: "withdraw" }] });
+              showToast(t(`🐷 +${kcal} kcal added to today`, `🐷 +${kcal} سعرة انضافت لليوم`));
+            }}
+            onRemove={(id) => updateReserve({ ...reserve, moves: reserve.moves.filter((m) => m.id !== id) })}
+          />
+        )}
+
+        <footer className="text-center text-[11px] text-muted/70 mt-12">
+          {t("Personal nutrition planning tool. Not affiliated with McDonald's.", "أداة شخصية لتخطيط التغذية. غير تابعة لماكدونالدز.")}
+          <div className="mt-2 text-[12px] font-bold">
+            {t("Made by", "صُنع بواسطة")} <span className="gold-text">Mohammad Almansoori</span>
+          </div>
+        </footer>
+          </>
+        )}
+
+        {tab === "mcd" && (
+          <>
+        <DayBar eaten={eaten} targets={targets} />
+        <motion.header initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
+          <h1 className="text-2xl font-black tracking-tight">🍔 {t("What should I get?", "شو آخذ من ماك؟")}</h1>
+          <p className="text-xs text-muted mt-0.5">{t("Best orders for what's left today — or pick items yourself.", "أفضل طلبات على اللي باقي لك اليوم — أو اختار بنفسك.")}</p>
+        </motion.header>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setMenuOpen(true)}
+          className="mt-2.5 w-full rounded-2xl p-4 flex items-center gap-3 text-start ring-1 ring-gold/30"
+          style={{ background: "linear-gradient(135deg,rgba(255,199,44,0.16),rgba(218,41,28,0.12))" }}
+        >
+          <motion.span
+            className="h-10 w-10 rounded-xl bg-gold text-xl flex items-center justify-center"
+            animate={{ rotate: [0, -8, 8, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 3 }}
+          >
+            🍟
+          </motion.span>
+          <span className="flex-1">
+            <span className="block font-bold">{t("Pick from McDonald's menu", "اختار من منيو ماك")}</span>
+            <span className="block text-[11px] text-muted">
+              {t("Choose items yourself — today or a past day", "اختار الأصناف بنفسك — لليوم أو ليوم فات")}
+            </span>
+          </span>
+          <span className="text-gold rtl:rotate-180">›</span>
+        </motion.button>
+        {/* CTA */}
+        <Link href="/quick" className="block mt-3">
+          <motion.div
+            whileTap={{ scale: 0.97 }}
+            className="w-full rounded-2xl py-3 text-center text-sm font-bold text-gold ring-1 ring-gold/25 bg-gold/5"
+          >
+            ⚡ {t("In the queue? Quick mode — top 3, big text", "واقف بالطابور؟ الوضع السريع — أفضل 3 بخط كبير")}
+          </motion.div>
+        </Link>
+
+        {/* Results */}
+        <div ref={resultsRef} className="scroll-mt-4">
+          <AnimatePresence>
+            {(showResults || tab === "mcd") && (
+              <motion.section initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                <div className="flex items-center justify-between mt-7 mb-3">
+                  <h2 className="text-lg font-black">{t("Your best orders", "أفضل طلبات لك")}</h2>
+                </div>
+                <div className="relative grid grid-cols-4 p-1 rounded-2xl glass mb-4">
+                  {(["all", "beef", "chicken", "breakfast"] as Filter[]).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => {
+                        setFilter(f);
+                        setShown(PAGE);
+                      }}
+                      className={`relative py-2 text-xs font-bold transition-colors ${filter === f ? "text-black" : "text-muted"}`}
+                    >
+                      {filter === f && (
+                        <motion.span layoutId="filter-pill" className="absolute inset-0 rounded-xl bg-gold" transition={{ type: "spring", stiffness: 500, damping: 35 }} />
+                      )}
+                      <span className="relative">
+                        {f === "all"
+                          ? t("🍔 All", "🍔 الكل")
+                          : f === "beef"
+                            ? t("🥩 Beef", "🥩 لحم")
+                            : f === "chicken"
+                              ? t("🍗 Chicken", "🍗 دجاج")
+                              : t("🍳 Breakfast", "🍳 فطور")}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {recommendations.length === 0 ? (
+                  <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-xl3 p-5">
+                    <p className="font-bold mb-3">{t("No exact McDonald's combination fits.", "ما في طلب من ماك يناسب بالضبط.")}</p>
+                    <p className="text-xs text-muted mb-2">{t("Remaining:", "الباقي:")}</p>
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      {[
+                        { k: t("kcal", "سعرة"), v: Math.max(0, Math.round(targets.kcal - eaten.kcal)) },
+                        { k: t("protein", "بروتين"), v: Math.max(0, Math.round(targets.proteinMin - eaten.protein)) },
+                        { k: t("fat", "دهون"), v: Math.max(0, Math.round(targets.fatMax - eaten.fat)) },
+                        { k: t("carbs", "كارب"), v: Math.max(0, Math.round(targets.carbsRef - eaten.carbs)) },
+                      ].map((s) => (
+                        <div key={s.k} className="rounded-xl bg-white/[0.04] py-2">
+                          <div className="font-extrabold">{s.v}</div>
+                          <div className="text-[10px] uppercase text-muted">{s.k}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-sm text-muted mt-3">{t("Finish the remaining macros yourself.", "كمّل الماكروز الباقية بنفسك.")}</p>
+                  </motion.div>
+                ) : (
+                  <LayoutGroup>
+                    <div className="space-y-3">
+                      <AnimatePresence mode="popLayout">
+                        {recommendations.slice(0, shown).map((combo, i) => (
+                          <RecommendationCard
+                            key={`${filter}:${combinationKey(combo)}`}
+                            combo={combo}
+                            index={i >= PAGE ? (i % PAGE) : i}
+                            proteinTarget={targets.proteinMin}
+                            history={historyFor(combinationKey(combo))}
+                            onSelect={() => selectCombination(combo)}
+                          />
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                    {shown < recommendations.length ? (
+                      <motion.button
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setShown((n) => n + PAGE)}
+                        className="mt-3 w-full rounded-2xl py-3.5 text-sm font-bold text-gold ring-1 ring-gold/30 bg-gold/5"
+                      >
+                        {t(
+                          `More options (+${Math.min(PAGE, recommendations.length - shown)}) ↓`,
+                          `زيد خيارات (+${Math.min(PAGE, recommendations.length - shown)}) ↓`
+                        )}
+                      </motion.button>
+                    ) : (
+                      shown > PAGE && (
+                        <p className="mt-3 text-center text-xs text-muted">
+                          {recommendations.length >= MAX_RECOMMENDATIONS
+                            ? t(`That's the limit — ${MAX_RECOMMENDATIONS} options.`, `هذا الحد — ${MAX_RECOMMENDATIONS} خيار.`)
+                            : t(`That's every option that fits (${recommendations.length}).`, `هذي كل الخيارات اللي تناسب (${recommendations.length}).`)}
+                        </p>
+                      )
+                    )}
+                  </LayoutGroup>
+                )}
+              </motion.section>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Favorites — tap + to order again */}
+        {favorites.length > 0 && (
+          <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-muted uppercase tracking-[0.16em]">⭐ {t("Your Favorites", "مفضلاتك")}</h2>
+              <Link href="/stats?tab=orders" className="text-xs font-bold text-gold">
+                {t("See all →", "الكل ←")}
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {favorites.map((f, i) => {
+                const items = orderItems(f, settings.foods, settings.nada);
+                const kcal = Math.round(sumMacros(items.map((it) => scaleMacros(it.macros, it.qty))).kcal);
+                return (
+                  <motion.div
+                    key={f.key}
+                    initial={{ opacity: 0, x: -16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                    className="glass rounded-2xl ps-4 pe-2 py-2.5 flex items-center gap-3"
+                  >
+                    <span className="text-gold font-black">{i + 1}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm">{f.label}</span>
+                      <span className="block text-[11px] text-muted">
+                        {kcal} kcal · ×{f.count}
+                      </span>
+                    </span>
+                    <motion.button
+                      whileTap={{ scale: 0.88 }}
+                      disabled={!items.length}
+                      onClick={() => logOrder(todayKey(), items)}
+                      className="rounded-xl bg-gold text-black text-xs font-extrabold px-3 py-2 disabled:opacity-30"
+                    >
+                      {t("↻ Again", "↻ مرة ثانية")}
+                    </motion.button>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.section>
+        )}
+
+          </>
+        )}
+
+        {tab === "log" && (
+          <>
+        <DayBar eaten={eaten} targets={targets} />
+        <motion.header initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
+          <h1 className="text-2xl font-black tracking-tight">➕ {t("Log food", "سجّل أكلك")}</h1>
+          <p className="text-xs text-muted mt-0.5">{t("Usual meal, Nada, McDonald's, anything else — today or a past day.", "وجبتك المعتادة، ندى، ماك، أو أي شي ثاني — لليوم أو ليوم فات.")}</p>
+        </motion.header>
         {/* Copy yesterday */}
         <AnimatePresence>
           {day.entries.length === 0 && !!yesterday?.entries.length && (
@@ -761,205 +986,8 @@ export default function HomePage() {
           </motion.button>
         </div>
 
-        {/* CTA */}
-        <motion.button
-          whileTap={{ scale: 0.96 }}
-          whileHover={{ scale: 1.01 }}
-          onClick={openResults}
-          className="cta-shimmer mt-6 w-full rounded-xl3 py-5 font-black text-lg text-white tracking-tight shadow-[0_18px_40px_-12px_rgba(218,41,28,0.7)]"
-          style={{ background: "linear-gradient(135deg,#ff4d3d 0%,#da291c 50%,#a3160c 100%)" }}
-        >
-          <motion.span className="inline-block me-2" animate={{ rotate: [0, -12, 12, -6, 0] }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 2.5 }}>
-            🍔
-          </motion.span>
-          {t("WHAT SHOULD I GET FROM McDONALD'S?", "وش آخذ من ماكدونالدز؟")}
-        </motion.button>
-        <Link href="/quick" className="block mt-2.5">
-          <motion.div
-            whileTap={{ scale: 0.97 }}
-            className="w-full rounded-2xl py-3 text-center text-sm font-bold text-gold ring-1 ring-gold/25 bg-gold/5"
-          >
-            ⚡ {t("In the queue? Quick mode — top 3, big text", "واقف بالطابور؟ الوضع السريع — أفضل 3 بخط كبير")}
-          </motion.div>
-        </Link>
-
-        {/* Results */}
-        <div ref={resultsRef} className="scroll-mt-4">
-          <AnimatePresence>
-            {showResults && (
-              <motion.section initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                <div className="flex items-center justify-between mt-7 mb-3">
-                  <h2 className="text-lg font-black">{t("Your best orders", "أفضل طلبات لك")}</h2>
-                  <button onClick={() => setShowResults(false)} className="text-xs text-muted px-2 py-1">
-                    {t("Hide", "إخفاء")}
-                  </button>
-                </div>
-                <div className="relative grid grid-cols-4 p-1 rounded-2xl glass mb-4">
-                  {(["all", "beef", "chicken", "breakfast"] as Filter[]).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => {
-                        setFilter(f);
-                        setShown(PAGE);
-                      }}
-                      className={`relative py-2 text-xs font-bold transition-colors ${filter === f ? "text-black" : "text-muted"}`}
-                    >
-                      {filter === f && (
-                        <motion.span layoutId="filter-pill" className="absolute inset-0 rounded-xl bg-gold" transition={{ type: "spring", stiffness: 500, damping: 35 }} />
-                      )}
-                      <span className="relative">
-                        {f === "all"
-                          ? t("🍔 All", "🍔 الكل")
-                          : f === "beef"
-                            ? t("🥩 Beef", "🥩 لحم")
-                            : f === "chicken"
-                              ? t("🍗 Chicken", "🍗 دجاج")
-                              : t("🍳 Breakfast", "🍳 فطور")}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {recommendations.length === 0 ? (
-                  <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-xl3 p-5">
-                    <p className="font-bold mb-3">{t("No exact McDonald's combination fits.", "ما في طلب من ماك يناسب بالضبط.")}</p>
-                    <p className="text-xs text-muted mb-2">{t("Remaining:", "الباقي:")}</p>
-                    <div className="grid grid-cols-4 gap-2 text-center">
-                      {[
-                        { k: t("kcal", "سعرة"), v: Math.max(0, Math.round(targets.kcal - eaten.kcal)) },
-                        { k: t("protein", "بروتين"), v: Math.max(0, Math.round(targets.proteinMin - eaten.protein)) },
-                        { k: t("fat", "دهون"), v: Math.max(0, Math.round(targets.fatMax - eaten.fat)) },
-                        { k: t("carbs", "كارب"), v: Math.max(0, Math.round(targets.carbsRef - eaten.carbs)) },
-                      ].map((s) => (
-                        <div key={s.k} className="rounded-xl bg-white/[0.04] py-2">
-                          <div className="font-extrabold">{s.v}</div>
-                          <div className="text-[10px] uppercase text-muted">{s.k}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-sm text-muted mt-3">{t("Finish the remaining macros yourself.", "كمّل الماكروز الباقية بنفسك.")}</p>
-                  </motion.div>
-                ) : (
-                  <LayoutGroup>
-                    <div className="space-y-3">
-                      <AnimatePresence mode="popLayout">
-                        {recommendations.slice(0, shown).map((combo, i) => (
-                          <RecommendationCard
-                            key={`${filter}:${combinationKey(combo)}`}
-                            combo={combo}
-                            index={i >= PAGE ? (i % PAGE) : i}
-                            proteinTarget={targets.proteinMin}
-                            history={historyFor(combinationKey(combo))}
-                            onSelect={() => selectCombination(combo)}
-                          />
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                    {shown < recommendations.length ? (
-                      <motion.button
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => setShown((n) => n + PAGE)}
-                        className="mt-3 w-full rounded-2xl py-3.5 text-sm font-bold text-gold ring-1 ring-gold/30 bg-gold/5"
-                      >
-                        {t(
-                          `More options (+${Math.min(PAGE, recommendations.length - shown)}) ↓`,
-                          `زيد خيارات (+${Math.min(PAGE, recommendations.length - shown)}) ↓`
-                        )}
-                      </motion.button>
-                    ) : (
-                      shown > PAGE && (
-                        <p className="mt-3 text-center text-xs text-muted">
-                          {recommendations.length >= MAX_RECOMMENDATIONS
-                            ? t(`That's the limit — ${MAX_RECOMMENDATIONS} options.`, `هذا الحد — ${MAX_RECOMMENDATIONS} خيار.`)
-                            : t(`That's every option that fits (${recommendations.length}).`, `هذي كل الخيارات اللي تناسب (${recommendations.length}).`)}
-                        </p>
-                      )
-                    )}
-                  </LayoutGroup>
-                )}
-              </motion.section>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Favorites — tap + to order again */}
-        {favorites.length > 0 && (
-          <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-8">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-muted uppercase tracking-[0.16em]">⭐ {t("Your Favorites", "مفضلاتك")}</h2>
-              <Link href="/stats?tab=orders" className="text-xs font-bold text-gold">
-                {t("See all →", "الكل ←")}
-              </Link>
-            </div>
-            <div className="space-y-2">
-              {favorites.map((f, i) => {
-                const items = orderItems(f, settings.foods, settings.nada);
-                const kcal = Math.round(sumMacros(items.map((it) => scaleMacros(it.macros, it.qty))).kcal);
-                return (
-                  <motion.div
-                    key={f.key}
-                    initial={{ opacity: 0, x: -16 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.06 }}
-                    className="glass rounded-2xl ps-4 pe-2 py-2.5 flex items-center gap-3"
-                  >
-                    <span className="text-gold font-black">{i + 1}</span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm">{f.label}</span>
-                      <span className="block text-[11px] text-muted">
-                        {kcal} kcal · ×{f.count}
-                      </span>
-                    </span>
-                    <motion.button
-                      whileTap={{ scale: 0.88 }}
-                      disabled={!items.length}
-                      onClick={() => logOrder(todayKey(), items)}
-                      className="rounded-xl bg-gold text-black text-xs font-extrabold px-3 py-2 disabled:opacity-30"
-                    >
-                      {t("↻ Again", "↻ مرة ثانية")}
-                    </motion.button>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </motion.section>
+          </>
         )}
-
-        {/* Today's log */}
-        {day.entries.length > 0 && (
-          <section className="mt-8">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-muted uppercase tracking-[0.16em]">{t("Today", "اليوم")}</h2>
-              <Link href="/stats?tab=days" className="text-xs font-bold text-gold">
-                {t("Past days →", "الأيام السابقة ←")}
-              </Link>
-            </div>
-            <DayLog
-              entries={day.entries}
-              payments={day.payments}
-              onRemoveEntry={removeEntry}
-              onRemoveGroup={removeGroup}
-              onEditOrder={(groupId) => setEditing({ date: day.date, groupId, qty: orderQty(day, groupId, settings.foods) })}
-              onEditPayment={(orderId, label) => {
-                const items = day.entries.filter((e) => e.groupId === orderId && e.kind === "mcdonalds");
-                setPay({
-                  date: day.date,
-                  orderId,
-                  label,
-                  kcal: sumMacros(items.map((e) => e.macros)).kcal,
-                  protein: items.reduce((n, e) => n + e.macros.protein, 0),
-                });
-              }}
-            />
-            <DayCostBar day={day} nadaPrice={settings.nada.price} />
-          </section>
-        )}
-
-        <footer className="text-center text-[11px] text-muted/70 mt-12">
-          {t("Personal nutrition planning tool. Not affiliated with McDonald's.", "أداة شخصية لتخطيط التغذية. غير تابعة لماكدونالدز.")}
-          <div className="mt-2 text-[12px] font-bold">
-            {t("Made by", "صُنع بواسطة")} <span className="gold-text">Mohammad Almansoori</span>
-          </div>
-        </footer>
       </main>
 
       <McMenuSheet

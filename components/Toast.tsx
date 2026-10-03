@@ -15,7 +15,7 @@ export function Toast({ toast, onDismiss }: { toast: ToastData | null; onDismiss
   return (
     <div
       className="fixed inset-x-0 z-30 flex justify-center px-4 pointer-events-none"
-      style={{ bottom: "max(1rem, env(safe-area-inset-bottom))" }}
+      style={{ bottom: "calc(4.75rem + env(safe-area-inset-bottom))" }}
     >
       <AnimatePresence>
         {toast && (

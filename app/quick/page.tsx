@@ -1,5 +1,6 @@
 "use client";
 
+import { DayBarLive } from "@/components/DayBar";
 import { effectiveTargets } from "@/lib/goals";
 import { foodEmoji } from "@/lib/foodEmoji";
 
@@ -99,6 +100,7 @@ export default function QuickPage() {
 
   return (
     <main className="max-w-md mx-auto px-4 pb-10 min-h-screen flex flex-col" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
+      <DayBarLive />
       <header className="flex items-center justify-between mb-4">
         <Link href="/" className="h-12 w-12 rounded-2xl glass flex items-center justify-center text-xl text-muted" aria-label={t("Back", "رجوع")}>
           <span className="rtl:rotate-180">←</span>

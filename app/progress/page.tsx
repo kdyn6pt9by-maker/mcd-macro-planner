@@ -1,5 +1,7 @@
 "use client";
 
+import { DayBarLive } from "@/components/DayBar";
+import { ProgressTabs } from "@/components/ProgressTabs";
 import { effectiveTargets, pctForCalories } from "@/lib/goals";
 import { dayAdjust, loadReserve } from "@/lib/reserve";
 import { AnimatePresence, motion } from "framer-motion";
@@ -169,6 +171,8 @@ export default function ProgressPage() {
 
   return (
     <main className="max-w-md mx-auto px-4 pb-24" style={{ paddingTop: "max(1.25rem, env(safe-area-inset-top))" }}>
+      <DayBarLive />
+      <ProgressTabs />
       <header className="flex items-center gap-3 mb-6">
         <Link href="/" className="h-11 w-11 rounded-2xl glass flex items-center justify-center text-muted" aria-label={t("Back", "رجوع")}>
           <span className="rtl:rotate-180">←</span>

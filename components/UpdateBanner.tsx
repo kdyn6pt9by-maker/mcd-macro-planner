@@ -43,7 +43,7 @@ export function UpdateBanner() {
   return (
     <div
       className="fixed inset-x-0 z-[55] flex justify-center px-4 pointer-events-none"
-      style={{ bottom: "max(5.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))" }}
+      style={{ bottom: "calc(8.5rem + env(safe-area-inset-bottom))" }}
     >
       <AnimatePresence>
         {available && (

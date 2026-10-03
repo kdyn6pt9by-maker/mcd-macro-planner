@@ -1,4 +1,5 @@
 import { sumMacros } from "./engine/macros";
+import { notifyDataChanged } from "./events";
 import { effectiveTargets, weekBank } from "./goals";
 import { fromKey, toKey } from "./progress";
 import { DayState, Settings } from "./types";
@@ -54,6 +55,7 @@ export function saveReserve(state: ReserveState) {
   try {
     window.localStorage.setItem(RESERVE_KEY, JSON.stringify(state));
   } catch {}
+  notifyDataChanged();
 }
 
 const addDays = (key: string, n: number) => {

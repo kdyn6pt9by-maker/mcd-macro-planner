@@ -1,6 +1,7 @@
 import { DayMode, DayState, FoodItem, Macros, Settings } from "./types";
 import { SETTINGS_VERSION, defaultSettings } from "./data/defaultSettings";
 import { applyOfficialMenu, applyOfficialNuggets } from "./data/officialMenu";
+import { notifyDataChanged } from "./events";
 import type { WeightEntry } from "./progress";
 
 const SETTINGS_KEY = "mcd-planner:settings";
@@ -149,12 +150,14 @@ export function saveDay(day: DayState) {
   if (day.entries.length === 0) delete days[day.date];
   else days[day.date] = day;
   safeSet(DAYS_KEY, days);
+  notifyDataChanged();
 }
 
 export function deleteDay(date: string) {
   const days = loadAllDays();
   delete days[date];
   safeSet(DAYS_KEY, days);
+  notifyDataChanged();
 }
 
 /** Past days, newest first. */
