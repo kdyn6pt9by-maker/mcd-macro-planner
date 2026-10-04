@@ -84,7 +84,7 @@ export default function ProgressPage() {
   const weekdaysLogged = weekPoints.filter((p) => p.totals && fromKey(p.date).getDay() % 6 !== 0);
   const proteinWeekdays = weekdaysLogged.filter((p) => p.totals!.protein >= targets.proteinMin).length;
   const reserve = loadReserve();
-  const streak = weekdayStreak(days, targets, new Date(), (d) => dayAdjust(d, days, settings, reserve).total);
+  const streak = weekdayStreak(days, targets, new Date(), (d) => { const a = dayAdjust(d, days, settings, reserve); return a.total + a.plan; });
   const strip = weekStrip(days, targets);
   const trend = weightTrend(weights);
   const rate = weeklyRate(weights);

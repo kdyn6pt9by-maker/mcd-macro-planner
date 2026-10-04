@@ -17,6 +17,8 @@ export function BankCard({
   choices,
   payback,
   onToggle,
+  plan,
+  onPlan,
 }: {
   bank: WeekBank;
   adjust: (date: string) => DayAdjust;
@@ -24,6 +26,9 @@ export function BankCard({
   /** This week's payback of last weekend's overage, if any. */
   payback?: Payback;
   onToggle: (date: string) => void;
+  /** Planned saving per day Mon–Thu this week. */
+  plan: number;
+  onPlan: (kcal: number) => void;
 }) {
   const { t, date } = useI18n();
   const today = todayKey();
@@ -40,6 +45,32 @@ export function BankCard({
       <div className="flex items-center justify-between">
         <div className="text-sm font-black">🏦 {t("Calorie bank", "بنك السعرات")}</div>
         <div className="text-[10px] text-muted">{t("Save Mon–Thu → spend Fri–Sun", "توفّر الاثنين–الخميس ← تصرف الجمعة–الأحد")}</div>
+      </div>
+
+      {/* Plan ahead: eat X under target Mon–Thu so the weekend gets more */}
+      <div className="mt-3 rounded-xl bg-black/25 px-3 py-2.5">
+        <div className="text-[11px] font-bold">🎯 {t("Save each day this week (Mon–Thu)", "وفّر كل يوم هالأسبوع (الاثنين–الخميس)")}</div>
+        <div className="flex gap-1.5 mt-2">
+          {[0, 100, 200, 300, 400].map((n) => (
+            <button
+              key={n}
+              onClick={() => onPlan(n)}
+              className={`btn-tap flex-1 rounded-lg py-1.5 text-xs font-black transition-colors ${
+                plan === n ? "bg-sky-400 text-black" : "bg-white/[0.06] text-muted"
+              }`}
+            >
+              {n === 0 ? t("Off", "لا") : `−${n}`}
+            </button>
+          ))}
+        </div>
+        {plan > 0 && (
+          <div className="text-[11px] text-sky-200 mt-2">
+            {t(
+              `Target Mon–Thu: ${(bank.saveDays[0]?.target ?? 0) - plan} · stick to it and Fri, Sat, Sun get +${Math.round((plan * 4) / 3)} each.`,
+              `هدفك الاثنين–الخميس: ${(bank.saveDays[0]?.target ?? 0) - plan} · إذا التزمت، الجمعة والسبت والأحد كل يوم +${Math.round((plan * 4) / 3)}.`
+            )}
+          </div>
+        )}
       </div>
 
       {/* Mon–Thu: what each logged day saved */}

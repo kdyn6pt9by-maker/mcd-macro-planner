@@ -87,3 +87,18 @@ describe("unused weekend extra goes to the reserve", () => {
     expect(reserveBalance(d, settings, r, "2026-10-05").balance).toBe(200);
   });
 });
+
+describe("planned saving (save X a day this week)", () => {
+  it("lowers Mon–Thu targets but still fills the weekend bank", async () => {
+    const { dayAdjust } = await import("./reserve");
+    const { weekBank } = await import("./goals");
+    const { fromKey } = await import("./progress");
+    const r: ReserveState = { ...EMPTY_RESERVE, plans: { "2026-09-28": 200 } };
+    expect(dayAdjust("2026-09-29", {}, settings, r).total).toBe(-200);
+    expect(dayAdjust("2026-10-02", {}, settings, r).plan).toBe(0);
+    // Ate exactly the planned 1800 on all four days → 800 saved → +267 each Fri/Sat/Sun
+    const ate = Object.fromEntries(["2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01"].map((d) => [d, day(d, 1800)]));
+    expect(weekBank(ate, settings, fromKey("2026-10-02")).perDay).toBe(267);
+    expect(dayAdjust("2026-10-03", ate, settings, r).bonus).toBe(267);
+  });
+});

@@ -156,7 +156,7 @@ function HomeScreen() {
   useEffect(() => {
     if (!settings || !day) return;
     const all = loadAllDays();
-    const s = weekdayStreak(all, effectiveTargets(settings, "workday"), new Date(), (d) => dayAdjust(d, all, settings, reserve).total);
+    const s = weekdayStreak(all, effectiveTargets(settings, "workday"), new Date(), (d) => { const a = dayAdjust(d, all, settings, reserve); return a.total + a.plan; });
     setStreak(s);
     const celebrated = loadCelebratedStreak();
     if (s < celebrated) saveCelebratedStreak(s - (s % STREAK_MILESTONE));
@@ -614,6 +614,15 @@ function HomeScreen() {
             choices={reserve.choices}
             payback={reserve.paybacks[mondayOf(todayKey())]}
             onToggle={toggleWeekend}
+            plan={reserve.plans?.[mondayOf(todayKey())] ?? 0}
+            onPlan={(kcal) => {
+              updateReserve({ ...reserve, plans: { ...reserve.plans, [mondayOf(todayKey())]: kcal } });
+              showToast(
+                kcal
+                  ? t(`🎯 Saving ${kcal} a day Mon–Thu — your target is lower this week`, `🎯 توفّر ${kcal} باليوم الاثنين–الخميس — هدفك أقل هالأسبوع`)
+                  : t("🎯 Saving plan off", "🎯 انلغى التوفير")
+              );
+            }}
           />
         )}
         {(reserveInfo.lines.length > 0 || reserveInfo.balance !== 0) && (

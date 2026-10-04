@@ -33,9 +33,14 @@ export interface ReserveState {
   moves: ReserveMove[];
   /** Keyed by the Monday after the weekend. */
   paybacks: Record<string, Payback>;
+  /**
+   * Planned saving: kcal a day to eat under target Mon–Thu, keyed by that week's Monday. It lowers those days'
+   * targets but still counts as saving for the weekend bank (unlike a payback).
+   */
+  plans?: Record<string, number>;
 }
 
-export const EMPTY_RESERVE: ReserveState = { choices: {}, moves: [], paybacks: {} };
+export const EMPTY_RESERVE: ReserveState = { choices: {}, moves: [], paybacks: {}, plans: {} };
 const RESERVE_KEY = "mcd-planner:reserve";
 /** Weekend overage under this is noise, not worth asking about. */
 export const OVER_TOLERANCE = 100;
@@ -45,7 +50,7 @@ export function loadReserve(): ReserveState {
   try {
     const raw = window.localStorage.getItem(RESERVE_KEY);
     const v = raw ? JSON.parse(raw) : null;
-    return { choices: v?.choices ?? {}, moves: v?.moves ?? [], paybacks: v?.paybacks ?? {} };
+    return { choices: v?.choices ?? {}, moves: v?.moves ?? [], paybacks: v?.paybacks ?? {}, plans: v?.plans ?? {} };
   } catch {
     return EMPTY_RESERVE;
   }
@@ -76,6 +81,13 @@ export function paybackFor(date: string, reserve: ReserveState): number {
   return p?.decision === "reduce" && date >= p.from ? p.perDay : 0;
 }
 
+/** Planned saving for a Mon–Thu date (0 on other days). */
+export function planFor(date: string, reserve: ReserveState): number {
+  const dow = dowOf(date);
+  if (dow < 1 || dow > 4) return 0;
+  return reserve.plans?.[mondayOf(date)] ?? 0;
+}
+
 /** That day's raw Fri–Sun share from the weekly bank (before the use/store choice). */
 export function shareFor(date: string, days: Record<string, DayState>, settings: Settings, reserve: ReserveState): number {
   if (!isSpendDate(date)) return 0;
@@ -89,6 +101,8 @@ export interface DayAdjust {
   stored: number;
   withdrawn: number;
   payback: number;
+  /** Planned saving taken off a Mon–Thu target. */
+  plan: number;
   /** Net kcal added to (or, if negative, taken off) the day's target. */
   total: number;
 }
@@ -99,7 +113,8 @@ export function dayAdjust(date: string, days: Record<string, DayState>, settings
   const bonus = share - stored;
   const withdrawn = reserve.moves.filter((m) => m.kind === "withdraw" && m.date === date).reduce((n, m) => n + m.kcal, 0);
   const payback = paybackFor(date, reserve);
-  return { share, bonus, stored, withdrawn, payback, total: bonus + withdrawn - payback };
+  const plan = planFor(date, reserve);
+  return { share, bonus, stored, withdrawn, payback, plan, total: bonus + withdrawn - payback - plan };
 }
 
 export interface ReserveLine {
