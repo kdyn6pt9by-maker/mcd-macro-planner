@@ -67,3 +67,23 @@ describe("weekend overage", () => {
     expect(pendingOverage("2026-10-06", over, settings, r)).toBeNull();
   });
 });
+
+describe("unused weekend extra goes to the reserve", () => {
+  it("moves what wasn't eaten of a used extra, once the day is over", async () => {
+    const { reserveBalance, unusedExtra } = await import("./reserve");
+    // Fri share 200 → allowed 2200; ate 2080 → 120 unused. Sat ate 1900 → capped at the 200 extra.
+    const d = { ...week, "2026-10-02": day("2026-10-02", 2080), "2026-10-03": day("2026-10-03", 1900) };
+    const r: ReserveState = { ...EMPTY_RESERVE, choices: { "2026-10-02": "use" } };
+    expect(unusedExtra("2026-10-02", d, settings, r)).toBe(120);
+    expect(unusedExtra("2026-10-03", d, settings, r)).toBe(200);
+    expect(reserveBalance(d, settings, r, "2026-10-03").balance).toBe(120); // Saturday not over yet
+    expect(reserveBalance(d, settings, r, "2026-10-05").balance).toBe(320);
+  });
+
+  it("never double-counts a stored day or an unlogged one", async () => {
+    const { reserveBalance } = await import("./reserve");
+    const d = { ...week, "2026-10-02": day("2026-10-02", 1500) };
+    const r: ReserveState = { ...EMPTY_RESERVE, choices: { "2026-10-02": "store" } };
+    expect(reserveBalance(d, settings, r, "2026-10-05").balance).toBe(200);
+  });
+});

@@ -194,7 +194,7 @@ function HomeScreen() {
 
   function chooseWeekend(date: string, choice: WeekendChoice) {
     updateReserve({ ...reserve, choices: { ...reserve.choices, [date]: choice } });
-    showToast(choice === "store" ? t("🐷 Stored — normal calories today", "🐷 انخزنت — سعراتك عادية اليوم") : t("🍔 Extra calories added to today", "🍔 انضافت السعرات الإضافية لليوم"));
+    showToast(choice === "store" ? t("💳 Stored — normal calories today", "💳 انخزنت — سعراتك عادية اليوم") : t("🍔 Extra calories added to today", "🍔 انضافت السعرات الإضافية لليوم"));
   }
 
   function toggleWeekend(date: string) {
@@ -214,7 +214,7 @@ function HomeScreen() {
       decision === "reduce"
         ? t(`✂️ −${overage.perDay} kcal a day until Thursday`, `✂️ −${overage.perDay} سعرة باليوم لين الخميس`)
         : decision === "cover"
-          ? t("🐷 Covered from your reserve", "🐷 تغطّت من المخزون")
+          ? t("💳 Covered from your reserve", "💳 تغطّت من المخزون")
           : t("👍 Carrying on normally", "👍 نكمل طبيعي")
     );
   }
@@ -623,7 +623,7 @@ function HomeScreen() {
             todayWithdrawn={adjust?.withdrawn ?? 0}
             onWithdraw={(kcal) => {
               updateReserve({ ...reserve, moves: [...reserve.moves, { id: uid(), date: todayKey(), kcal, kind: "withdraw" }] });
-              showToast(t(`🐷 +${kcal} kcal added to today`, `🐷 +${kcal} سعرة انضافت لليوم`));
+              showToast(t(`💳 +${kcal} kcal added to today`, `💳 +${kcal} سعرة انضافت لليوم`));
             }}
             onRemove={(id) => updateReserve({ ...reserve, moves: reserve.moves.filter((m) => m.id !== id) })}
           />

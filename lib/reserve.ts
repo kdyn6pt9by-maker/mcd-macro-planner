@@ -105,17 +105,45 @@ export function dayAdjust(date: string, days: Record<string, DayState>, settings
 export interface ReserveLine {
   date: string;
   kcal: number;
-  kind: "store" | "withdraw" | "cover";
+  /** leftover = a weekend extra you chose to use but didn't eat, moved here automatically once the day is over. */
+  kind: "store" | "withdraw" | "cover" | "leftover";
   id?: string;
 }
 
 /** Reserve balance and its history (newest first). */
-export function reserveBalance(days: Record<string, DayState>, settings: Settings, reserve: ReserveState): { balance: number; lines: ReserveLine[] } {
+/**
+ * The part of a finished Fri/Sat/Sun's bank extra that wasn't eaten (only when the extra was used, not stored,
+ * and the day was logged). Capped at the extra itself, so eating under your normal target never adds more.
+ */
+export function unusedExtra(date: string, days: Record<string, DayState>, settings: Settings, reserve: ReserveState): number {
+  if (!isSpendDate(date) || reserve.choices[date] === "store") return 0;
+  const day = days[date];
+  if (!day?.entries.length) return 0;
+  const a = dayAdjust(date, days, settings, reserve);
+  if (a.bonus <= 0) return 0;
+  const mode = [0, 6].includes(dowOf(date)) ? "weekend" : "workday";
+  const allowed = effectiveTargets(settings, mode).kcal + a.total;
+  const eaten = sumMacros(day.entries.map((e) => e.macros)).kcal;
+  return Math.max(0, Math.min(a.bonus, Math.round(allowed - eaten)));
+}
+
+export function reserveBalance(
+  days: Record<string, DayState>,
+  settings: Settings,
+  reserve: ReserveState,
+  today = toKey(new Date())
+): { balance: number; lines: ReserveLine[] } {
   const lines: ReserveLine[] = [];
   for (const [date, choice] of Object.entries(reserve.choices)) {
     if (choice !== "store") continue;
     const kcal = shareFor(date, days, settings, reserve);
     if (kcal > 0) lines.push({ date, kcal, kind: "store" });
+  }
+  // Weekend extras that went uneaten are kept, not lost — counted once the day is over.
+  for (const date of Object.keys(days)) {
+    if (date >= today) continue;
+    const kcal = unusedExtra(date, days, settings, reserve);
+    if (kcal > 0) lines.push({ date, kcal, kind: "leftover" });
   }
   for (const m of reserve.moves) lines.push({ date: m.date, kcal: -m.kcal, kind: m.kind, id: m.id });
   lines.sort((a, b) => b.date.localeCompare(a.date));

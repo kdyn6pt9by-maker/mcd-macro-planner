@@ -22,7 +22,13 @@ export function ReserveCard({ balance, lines, todayWithdrawn, onWithdraw, onRemo
   const [open, setOpen] = useState(false);
   const presets = [100, 200, 300, 500].filter((n) => n <= balance);
   const label = (l: ReserveLine) =>
-    l.kind === "store" ? t("Stored", "تخزين") : l.kind === "withdraw" ? t("Used", "استخدمت") : t("Covered weekend", "غطّيت الويكند");
+    l.kind === "store"
+      ? t("Stored", "تخزين")
+      : l.kind === "leftover"
+        ? t("Unused weekend extra", "زيادة ما انأكلت")
+        : l.kind === "withdraw"
+          ? t("Used", "استخدمت")
+          : t("Covered weekend", "غطّيت الويكند");
 
   return (
     <motion.div
@@ -33,7 +39,7 @@ export function ReserveCard({ balance, lines, todayWithdrawn, onWithdraw, onRemo
     >
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between">
         <div className="text-start">
-          <div className="text-sm font-black">🐷 {t("Extra calories reserve", "مخزون السعرات الإضافية")}</div>
+          <div className="text-sm font-black">💳 {t("Extra calories reserve", "مخزون السعرات الإضافية")}</div>
           <div className="text-[10px] text-muted">{t("Separate from the weekend bank", "غير عن بنك الويكند")}</div>
         </div>
         <div className="text-end">

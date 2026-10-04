@@ -89,7 +89,7 @@ export function BankCard({
                 {bank.perDay <= 0
                   ? t("normal", "عادي")
                   : stored
-                    ? t(`🐷 stored ${bank.perDay}`, `🐷 خزّنت ${bank.perDay}`)
+                    ? t(`💳 stored ${bank.perDay}`, `💳 خزّنت ${bank.perDay}`)
                     : `${d.target.toLocaleString("en-US")} + ${bank.perDay}${choices[d.date] === "use" ? " ✓" : ""}`}
               </div>
             </button>

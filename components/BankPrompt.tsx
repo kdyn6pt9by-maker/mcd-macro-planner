@@ -48,7 +48,7 @@ export function BankPrompt({ choice, overage, balance, onChoose, onOverage }: Pr
                     🍔 {t(`Use them today (+${fmt(choice.share)})`, `استخدمها اليوم (+${fmt(choice.share)})`)}
                   </button>
                   <button onClick={() => onChoose(choice.date, "store")} className="btn-tap rounded-2xl bg-sky-400/15 ring-1 ring-sky-400/40 text-sky-200 py-3.5 font-black">
-                    🐷 {t("Normal calories — store them", "سعرات عادية — خزّنها")}
+                    💳 {t("Normal calories — store them", "سعرات عادية — خزّنها")}
                   </button>
                 </div>
               </>
@@ -71,7 +71,7 @@ export function BankPrompt({ choice, overage, balance, onChoose, onOverage }: Pr
                   </button>
                   {canCover && (
                     <button onClick={() => onOverage(overage.monday, "cover")} className="btn-tap rounded-2xl bg-sky-400/15 ring-1 ring-sky-400/40 text-sky-200 py-3.5 font-black">
-                      🐷 {t(`Cover it from my reserve (${fmt(balance)} stored)`, `غطّيها من المخزون (عندك ${fmt(balance)})`)}
+                      💳 {t(`Cover it from my reserve (${fmt(balance)} stored)`, `غطّيها من المخزون (عندك ${fmt(balance)})`)}
                     </button>
                   )}
                   <button onClick={() => onOverage(overage.monday, "skip")} className="btn-tap rounded-2xl glass py-3.5 font-bold text-muted">
