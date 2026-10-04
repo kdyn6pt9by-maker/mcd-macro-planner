@@ -81,13 +81,17 @@ export function migrateSettings(stored: Partial<Settings> | null): Settings {
     merged.foods = applyOfficialMenu(merged.foods);
   }
   if (merged.version < 7) {
-    // v7: McNuggets 4 / 6 / 9 on the exact official numbers (4 pieces newly added).
+    // v7: McNuggets 6 / 9 on the exact official numbers.
     merged.foods = applyOfficialNuggets(merged.foods);
   }
   if (merged.version < 8) {
     // v8 added Small Fries — only adds what's missing.
     const have = new Set(merged.foods.map((f) => f.id));
     merged.foods = [...merged.foods, ...defaultSettings.foods.filter((f) => !have.has(f.id))];
+  }
+  if (merged.version < 9) {
+    // v9: 4-piece McNuggets removed from the menu (days it was logged on keep it).
+    merged.foods = merged.foods.filter((f) => f.id !== "mcnuggets-4");
   }
   merged.version = SETTINGS_VERSION;
   return merged;

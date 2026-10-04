@@ -25,7 +25,7 @@ describe("settings migration", () => {
     const v1 = { ...defaultSettings, version: undefined, nada: { ...defaultSettings.nada, maxPerDay: 3 } };
     const migrated = migrateSettings(v1 as never);
     expect(migrated.nada.maxPerDay).toBe(4);
-    expect(migrated.version).toBe(8);
+    expect(migrated.version).toBe(9);
     expect(migrated.foods.some((f) => f.id === "ice-cream-cone")).toBe(true);
     expect(migrated.goal).toEqual({ mode: "maintain", pct: 20 });
     expect(migrated.savedMeals).toEqual([]);
@@ -227,7 +227,7 @@ describe("official McDonald's UAE menu (v6)", () => {
     const old = { ...defaultSettings, version: 5, foods: [{ id: "big-mac", name: "Big Mac", category: "mcdonalds" as const, macros: { kcal: 549, protein: 23, fat: 30, carbs: 46 }, verified: true, enabled: true }] };
     window.localStorage.setItem("mcd-planner:settings", JSON.stringify(old));
     saveDay({ date: "2026-09-20", entries: [{ id: "x", kind: "mcdonalds", label: "Big Mac", macros: { kcal: 549, protein: 23, fat: 30, carbs: 46 }, at: "" }] });
-    expect(loadSettings().version).toBe(8);
+    expect(loadSettings().version).toBe(9);
     expect(loadDay("2026-09-20").entries[0].macros.kcal).toBe(564);
   });
 });
@@ -249,7 +249,7 @@ describe("McNuggets exactly as the official site (v7)", () => {
     saveDay({ date: "2026-09-21", entries: [{ id: "n", kind: "mcdonalds", label: "Chicken McNuggets (9 pc)", macros: { kcal: 344, protein: 22.5, fat: 18, carbs: 22.5 }, at: "" }] });
     const s = loadSettings();
     const m = (id: string) => s.foods.find((f) => f.id === id)?.macros;
-    expect(m("mcnuggets-4")).toEqual({ kcal: 153, protein: 10, fat: 8, carbs: 10 });
+    expect(m("mcnuggets-4")).toBeUndefined();
     expect(m("mcnuggets-6")).toEqual({ kcal: 229, protein: 15, fat: 12, carbs: 15 });
     expect(m("mcnuggets-9")).toEqual({ kcal: 343, protein: 23, fat: 18, carbs: 22 });
     expect(m("big-mac")?.kcal).toBe(570); // your own later edits stay

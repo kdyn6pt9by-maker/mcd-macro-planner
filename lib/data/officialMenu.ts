@@ -27,7 +27,6 @@ export const OFFICIAL_UAE_MENU: FoodItem[] = [
   item("chicken-mac", "Chicken Mac", 558, 26, 26, 55, "chicken-mac"),
   item("cheeseburger", "Cheeseburger", 305, 13, 13, 32, "cheeseburger"),
   item("double-cheeseburger", "Double Cheeseburger", 450, 21, 24, 34, "double-cheese-burger"),
-  item("mcnuggets-4", "Chicken McNuggets (4 pc)", 153, 10, 8, 10, "chicken-mcnuggets-4-pieces"),
   item("mcnuggets-6", "Chicken McNuggets (6 pc)", 229, 15, 12, 15, "chicken-mcnuggets-4-pieces"),
   item("mcnuggets-9", "Chicken McNuggets (9 pc)", 343, 23, 18, 22, "chicken-mcnuggets-4-pieces"),
   item("beef-burger", "Beef Burger", 254, 11, 9, 31, "beef-burger"),
@@ -45,9 +44,9 @@ export const OFFICIAL_UAE_MENU: FoodItem[] = [
 
 const norm = (s: string) => s.toLowerCase().replace(/™/g, "").replace(/[^a-z0-9]/g, "");
 
-const NUGGET_IDS = ["mcnuggets-4", "mcnuggets-6", "mcnuggets-9"];
+const NUGGET_IDS = ["mcnuggets-6", "mcnuggets-9"];
 
-/** Puts the 4/6/9 McNuggets on the exact official numbers (adding any that are missing); everything else untouched. */
+/** Puts the 6/9 McNuggets on the exact official numbers (adding any that are missing); everything else untouched. */
 export function applyOfficialNuggets(foods: FoodItem[]): FoodItem[] {
   const official = OFFICIAL_UAE_MENU.filter((f) => NUGGET_IDS.includes(f.id));
   const out = foods.map((f) => {
