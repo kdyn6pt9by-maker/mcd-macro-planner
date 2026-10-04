@@ -26,6 +26,8 @@ export function ReserveCard({ balance, lines, todayWithdrawn, onWithdraw, onRemo
       ? t("Stored", "تخزين")
       : l.kind === "leftover"
         ? t("Unused weekend extra", "زيادة ما انأكلت")
+        : l.kind === "plan"
+          ? t("🎯 Saving plan", "🎯 توفير")
         : l.kind === "withdraw"
           ? t("Used", "استخدمت")
           : t("Covered weekend", "غطّيت الويكند");

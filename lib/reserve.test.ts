@@ -88,17 +88,30 @@ describe("unused weekend extra goes to the reserve", () => {
   });
 });
 
-describe("planned saving (save X a day this week)", () => {
-  it("lowers Mon–Thu targets but still fills the weekend bank", async () => {
-    const { dayAdjust } = await import("./reserve");
+describe("saving plan (from today, for N days → reserve)", () => {
+  it("lowers targets on the plan's days and puts what was really saved in the reserve", async () => {
+    const { dayAdjust, reserveBalance, planSaved } = await import("./reserve");
+    // Plan from Tue 2026-09-29, 3 days, 200/day. Ate 1800, 1900, 2100.
+    const r: ReserveState = { ...EMPTY_RESERVE, savePlans: [{ id: "p", start: "2026-09-29", days: 3, kcal: 200 }] };
+    expect(dayAdjust("2026-09-28", {}, settings, r).total).toBe(0);
+    expect(dayAdjust("2026-09-29", {}, settings, r).total).toBe(-200);
+    expect(dayAdjust("2026-10-01", {}, settings, r).total).toBe(-200);
+    expect(dayAdjust("2026-10-02", {}, settings, r).plan).toBe(0);
+    const d = { "2026-09-29": day("2026-09-29", 1800), "2026-09-30": day("2026-09-30", 1900), "2026-10-01": day("2026-10-01", 2100) };
+    expect(["2026-09-29", "2026-09-30", "2026-10-01"].map((x) => planSaved(x, d, settings, r))).toEqual([200, 100, 0]);
+    // Counted once each day is over; not double-counted in the weekend bank.
+    expect(reserveBalance(d, settings, r, "2026-09-30").balance).toBe(200);
+    expect(reserveBalance(d, settings, r, "2026-10-02").balance).toBe(300);
+    expect(dayAdjust("2026-10-03", d, settings, r).share).toBe(0);
+  });
+
+  it("weekend bank counts only what went beyond the plan, and overs in full", async () => {
+    const { bankDeductFor } = await import("./reserve");
     const { weekBank } = await import("./goals");
     const { fromKey } = await import("./progress");
-    const r: ReserveState = { ...EMPTY_RESERVE, plans: { "2026-09-28": 200 } };
-    expect(dayAdjust("2026-09-29", {}, settings, r).total).toBe(-200);
-    expect(dayAdjust("2026-10-02", {}, settings, r).plan).toBe(0);
-    // Ate exactly the planned 1800 on all four days → 800 saved → +267 each Fri/Sat/Sun
-    const ate = Object.fromEntries(["2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01"].map((d) => [d, day(d, 1800)]));
-    expect(weekBank(ate, settings, fromKey("2026-10-02")).perDay).toBe(267);
-    expect(dayAdjust("2026-10-03", ate, settings, r).bonus).toBe(267);
+    const r: ReserveState = { ...EMPTY_RESERVE, savePlans: [{ id: "p", start: "2026-09-28", days: 4, kcal: 200 }] };
+    const d = { "2026-09-28": day("2026-09-28", 1500), "2026-09-29": day("2026-09-29", 2100) };
+    const b = weekBank(d, settings, fromKey("2026-10-02"), (x) => bankDeductFor(x, d, settings, r));
+    expect(b.saveDays.slice(0, 2).map((x) => x.diff)).toEqual([300, -100]);
   });
 });

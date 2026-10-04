@@ -33,14 +33,18 @@ export interface ReserveState {
   moves: ReserveMove[];
   /** Keyed by the Monday after the weekend. */
   paybacks: Record<string, Payback>;
-  /**
-   * Planned saving: kcal a day to eat under target Mon–Thu, keyed by that week's Monday. It lowers those days'
-   * targets but still counts as saving for the weekend bank (unlike a payback).
-   */
-  plans?: Record<string, number>;
+  /** Saving plans: eat `kcal` under target for `days` days from `start`; what you actually save goes to the reserve. */
+  savePlans?: SavePlan[];
 }
 
-export const EMPTY_RESERVE: ReserveState = { choices: {}, moves: [], paybacks: {}, plans: {} };
+export interface SavePlan {
+  id: string;
+  start: string;
+  days: number;
+  kcal: number;
+}
+
+export const EMPTY_RESERVE: ReserveState = { choices: {}, moves: [], paybacks: {}, savePlans: [] };
 const RESERVE_KEY = "mcd-planner:reserve";
 /** Weekend overage under this is noise, not worth asking about. */
 export const OVER_TOLERANCE = 100;
@@ -50,7 +54,7 @@ export function loadReserve(): ReserveState {
   try {
     const raw = window.localStorage.getItem(RESERVE_KEY);
     const v = raw ? JSON.parse(raw) : null;
-    return { choices: v?.choices ?? {}, moves: v?.moves ?? [], paybacks: v?.paybacks ?? {}, plans: v?.plans ?? {} };
+    return { choices: v?.choices ?? {}, moves: v?.moves ?? [], paybacks: v?.paybacks ?? {}, savePlans: v?.savePlans ?? [] };
   } catch {
     return EMPTY_RESERVE;
   }
@@ -81,17 +85,38 @@ export function paybackFor(date: string, reserve: ReserveState): number {
   return p?.decision === "reduce" && date >= p.from ? p.perDay : 0;
 }
 
-/** Planned saving for a Mon–Thu date (0 on other days). */
+/** Last day (inclusive) a plan covers. */
+export const planEnd = (p: SavePlan) => addDays(p.start, p.days - 1);
+
+/** kcal taken off a date's target by saving plans that cover it. */
 export function planFor(date: string, reserve: ReserveState): number {
-  const dow = dowOf(date);
-  if (dow < 1 || dow > 4) return 0;
-  return reserve.plans?.[mondayOf(date)] ?? 0;
+  return (reserve.savePlans ?? []).filter((p) => date >= p.start && date <= planEnd(p)).reduce((n, p) => n + p.kcal, 0);
+}
+
+/** The plan running today, if any. */
+export function activePlan(today: string, reserve: ReserveState): SavePlan | null {
+  return (reserve.savePlans ?? []).find((p) => today >= p.start && today <= planEnd(p)) ?? null;
+}
+
+/**
+ * What the weekly bank leaves out of a Mon–Thu target: a payback, plus whatever a saving plan saved that day
+ * (that part goes to the reserve, so it isn't counted twice). Going over is still counted in full.
+ */
+export function bankDeductFor(date: string, days: Record<string, DayState>, settings: Settings, reserve: ReserveState): number {
+  const payback = paybackFor(date, reserve);
+  const plan = planFor(date, reserve);
+  if (!plan) return payback;
+  const day = days[date];
+  if (!day?.entries.length) return payback;
+  const eaten = sumMacros(day.entries.map((e) => e.macros)).kcal;
+  const normal = effectiveTargets(settings, "workday").kcal - payback;
+  return payback + Math.max(0, Math.min(plan, Math.round(normal - eaten)));
 }
 
 /** That day's raw Fri–Sun share from the weekly bank (before the use/store choice). */
 export function shareFor(date: string, days: Record<string, DayState>, settings: Settings, reserve: ReserveState): number {
   if (!isSpendDate(date)) return 0;
-  return weekBank(days, settings, fromKey(date), (d) => paybackFor(d, reserve)).perDay;
+  return weekBank(days, settings, fromKey(date), (d) => bankDeductFor(d, days, settings, reserve)).perDay;
 }
 
 export interface DayAdjust {
@@ -120,8 +145,11 @@ export function dayAdjust(date: string, days: Record<string, DayState>, settings
 export interface ReserveLine {
   date: string;
   kcal: number;
-  /** leftover = a weekend extra you chose to use but didn't eat, moved here automatically once the day is over. */
-  kind: "store" | "withdraw" | "cover" | "leftover";
+  /**
+   * leftover = a weekend extra you chose to use but didn't eat; plan = what a saving plan actually saved.
+   * Both move here automatically once the day is over.
+   */
+  kind: "store" | "withdraw" | "cover" | "leftover" | "plan";
   id?: string;
 }
 
@@ -137,9 +165,21 @@ export function unusedExtra(date: string, days: Record<string, DayState>, settin
   const a = dayAdjust(date, days, settings, reserve);
   if (a.bonus <= 0) return 0;
   const mode = [0, 6].includes(dowOf(date)) ? "weekend" : "workday";
-  const allowed = effectiveTargets(settings, mode).kcal + a.total;
+  const allowed = effectiveTargets(settings, mode).kcal + a.total + a.plan;
   const eaten = sumMacros(day.entries.map((e) => e.macros)).kcal;
   return Math.max(0, Math.min(a.bonus, Math.round(allowed - eaten)));
+}
+
+/** What a saving plan actually saved on a finished, logged day: up to the planned amount, never more. */
+export function planSaved(date: string, days: Record<string, DayState>, settings: Settings, reserve: ReserveState): number {
+  const plan = planFor(date, reserve);
+  const day = days[date];
+  if (!plan || !day?.entries.length) return 0;
+  const a = dayAdjust(date, days, settings, reserve);
+  const mode = [0, 6].includes(dowOf(date)) ? "weekend" : "workday";
+  const normal = effectiveTargets(settings, mode).kcal + a.total + a.plan;
+  const eaten = sumMacros(day.entries.map((e) => e.macros)).kcal;
+  return Math.max(0, Math.min(plan, Math.round(normal - eaten)));
 }
 
 export function reserveBalance(
@@ -154,11 +194,13 @@ export function reserveBalance(
     const kcal = shareFor(date, days, settings, reserve);
     if (kcal > 0) lines.push({ date, kcal, kind: "store" });
   }
-  // Weekend extras that went uneaten are kept, not lost — counted once the day is over.
+  // Weekend extras that went uneaten, and what saving plans saved — counted once the day is over.
   for (const date of Object.keys(days)) {
     if (date >= today) continue;
     const kcal = unusedExtra(date, days, settings, reserve);
     if (kcal > 0) lines.push({ date, kcal, kind: "leftover" });
+    const saved = planSaved(date, days, settings, reserve);
+    if (saved > 0) lines.push({ date, kcal: saved, kind: "plan" });
   }
   for (const m of reserve.moves) lines.push({ date: m.date, kcal: -m.kcal, kind: m.kind, id: m.id });
   lines.sort((a, b) => b.date.localeCompare(a.date));
@@ -173,7 +215,8 @@ export function weekendOver(monday: string, days: Record<string, DayState>, sett
     if (!day?.entries.length) continue;
     const eaten = sumMacros(day.entries.map((e) => e.macros)).kcal;
     const mode = [0, 6].includes(dowOf(date)) ? "weekend" : "workday";
-    const allowed = effectiveTargets(settings, mode).kcal + dayAdjust(date, days, settings, reserve).total;
+    const a = dayAdjust(date, days, settings, reserve);
+    const allowed = effectiveTargets(settings, mode).kcal + a.total + a.plan;
     over += eaten - allowed;
   }
   return Math.round(over);

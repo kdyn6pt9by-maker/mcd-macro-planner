@@ -4,6 +4,7 @@ import { effectiveTargets, weekBank } from "@/lib/goals";
 import { BankCard } from "@/components/BankCard";
 import { BankPrompt } from "@/components/BankPrompt";
 import { ReserveCard } from "@/components/ReserveCard";
+import { SavePlanCard } from "@/components/SavePlanCard";
 import {
   EMPTY_RESERVE,
   Payback,
@@ -12,7 +13,9 @@ import {
   dayAdjust,
   loadReserve,
   mondayOf,
-  paybackFor,
+  activePlan,
+  bankDeductFor,
+  planSaved,
   pendingOverage,
   pendingWeekendChoice,
   reserveBalance,
@@ -174,7 +177,7 @@ function HomeScreen() {
 
   const allDays = useMemo(() => (day ? loadAllDays() : {}), [day]);
   const bank = useMemo(
-    () => (settings && day ? weekBank(allDays, settings, new Date(), (d) => paybackFor(d, reserve)) : null),
+    () => (settings && day ? weekBank(allDays, settings, new Date(), (d) => bankDeductFor(d, allDays, settings, reserve)) : null),
     [settings, day, allDays, reserve]
   );
   const adjustOn = useCallback((date: string) => dayAdjust(date, allDays, settings!, reserve), [allDays, settings, reserve]);
@@ -607,6 +610,35 @@ function HomeScreen() {
           </section>
         )}
 
+        {(() => {
+          const today = todayKey();
+          const plan = activePlan(today, reserve);
+          const saved = plan
+            ? Object.keys(allDays)
+                .filter((d) => d >= plan.start && d < today)
+                .reduce((n, d) => n + planSaved(d, allDays, settings, reserve), 0)
+            : 0;
+          return (
+            <SavePlanCard
+              today={today}
+              active={plan}
+              savedSoFar={saved}
+              normalTarget={targets.kcal + (adjust?.plan ?? 0)}
+              onStart={(kcal, days) => {
+                updateReserve({ ...reserve, savePlans: [...(reserve.savePlans ?? []), { id: uid(), start: today, days, kcal }] });
+                showToast(t(`🎯 Saving ${kcal} a day for ${days} days — starts today`, `🎯 توفّر ${kcal} باليوم لمدة ${days} أيام — من اليوم`));
+              }}
+              onStop={() => {
+                if (!plan) return;
+                // Keep the days already done (they've saved into the reserve); drop today and the rest.
+                const done = Math.round((fromKey(today).getTime() - fromKey(plan.start).getTime()) / 86_400_000);
+                const rest = (reserve.savePlans ?? []).filter((p) => p.id !== plan.id);
+                updateReserve({ ...reserve, savePlans: done > 0 ? [...rest, { ...plan, days: done }] : rest });
+                showToast(t("🎯 Saving stopped", "🎯 وقّفت التوفير"));
+              }}
+            />
+          );
+        })()}
         {bank && settings && (
           <BankCard
             bank={bank}
@@ -614,15 +646,6 @@ function HomeScreen() {
             choices={reserve.choices}
             payback={reserve.paybacks[mondayOf(todayKey())]}
             onToggle={toggleWeekend}
-            plan={reserve.plans?.[mondayOf(todayKey())] ?? 0}
-            onPlan={(kcal) => {
-              updateReserve({ ...reserve, plans: { ...reserve.plans, [mondayOf(todayKey())]: kcal } });
-              showToast(
-                kcal
-                  ? t(`🎯 Saving ${kcal} a day Mon–Thu — your target is lower this week`, `🎯 توفّر ${kcal} باليوم الاثنين–الخميس — هدفك أقل هالأسبوع`)
-                  : t("🎯 Saving plan off", "🎯 انلغى التوفير")
-              );
-            }}
           />
         )}
         {(reserveInfo.lines.length > 0 || reserveInfo.balance !== 0) && (
