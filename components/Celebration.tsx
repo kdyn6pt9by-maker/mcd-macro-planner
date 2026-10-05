@@ -29,7 +29,7 @@ export function Celebration({ streak, onDone }: { streak: number | null; onDone:
     <AnimatePresence>
       {streak !== null && (
         <motion.div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

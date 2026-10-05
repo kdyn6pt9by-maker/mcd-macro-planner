@@ -115,3 +115,28 @@ describe("saving plan (from today, for N days → reserve)", () => {
     expect(b.saveDays.slice(0, 2).map((x) => x.diff)).toEqual([300, -100]);
   });
 });
+
+describe("went over yesterday → make it up today", () => {
+  it("asks Tue–Fri about a logged Mon–Thu that went over by more than 100", async () => {
+    const { pendingYesterdayOver } = await import("./reserve");
+    const d = { "2026-09-29": day("2026-09-29", 2350), "2026-10-02": day("2026-10-02", 2600) };
+    expect(pendingYesterdayOver("2026-09-30", d, settings, EMPTY_RESERVE)).toEqual({ date: "2026-09-29", over: 350 });
+    expect(pendingYesterdayOver("2026-10-03", d, settings, EMPTY_RESERVE)).toBeNull(); // Friday → weekend question instead
+    const answered: ReserveState = { ...EMPTY_RESERVE, dayCuts: { "2026-09-29": { over: 350, from: "2026-09-30", days: 1, perDay: 0 } } };
+    expect(pendingYesterdayOver("2026-09-30", d, settings, answered)).toBeNull();
+    expect(pendingYesterdayOver("2026-09-30", { "2026-09-29": day("2026-09-29", 2080) }, settings, EMPTY_RESERVE)).toBeNull();
+  });
+
+  it("cuts from fat and carbs, protein unchanged", async () => {
+    const { targetsFor, applyCut } = await import("./targets");
+    const r: ReserveState = { ...EMPTY_RESERVE, dayCuts: { "2026-09-29": { over: 300, from: "2026-09-30", days: 2, perDay: 150 } } };
+    const t = targetsFor("2026-09-30", settings, "workday", {}, r);
+    expect(t.kcal).toBe(1850);
+    expect(t.proteinMin).toBe(140);
+    expect(t.fatMax).toBeLessThan(60);
+    expect(t.carbsRef).toBeLessThan(225);
+    expect(t.proteinMin * 4 + t.fatMax * 9 + t.carbsRef * 4).toBeCloseTo(140 * 4 + 60 * 9 + 225 * 4 - 150, -1);
+    expect(targetsFor("2026-10-02", settings, "workday", {}, r).kcal).toBe(2000);
+    expect(applyCut({ kcal: 2000, proteinMin: 140, fatMin: 50, fatMax: 60, carbsRef: 225 }, 0).fatMax).toBe(60);
+  });
+});

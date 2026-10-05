@@ -20,7 +20,7 @@ body {
   font-feature-settings: "tnum" 1, "ss01" 1;
 }
 
-/* Slowly drifting warm glows behind everything */
+/* Warm glows behind everything — static: animating these under the cards made iPhones stutter */
 .ambient {
   position: fixed;
   inset: 0;
@@ -42,32 +42,19 @@ body {
   background: radial-gradient(circle, var(--red) 0%, transparent 60%);
   top: -35vmax;
   left: -25vmax;
-  animation: drift1 18s ease-in-out infinite alternate;
 }
 .ambient::after {
   background: radial-gradient(circle, var(--gold) 0%, transparent 60%);
   bottom: -45vmax;
   right: -30vmax;
   opacity: 0.12;
-  animation: drift2 22s ease-in-out infinite alternate;
-}
-@keyframes drift1 {
-  to {
-    transform: translate(12vmax, 8vmax) scale(1.1);
-  }
-}
-@keyframes drift2 {
-  to {
-    transform: translate(-10vmax, -6vmax) scale(1.15);
-  }
 }
 
 .glass {
-  background: linear-gradient(160deg, rgba(58, 16, 20, 0.72), rgba(24, 8, 10, 0.82));
+  /* No backdrop-filter: on iPhone, dozens of blurred cards over the glow made scrolling and taps stall. */
+  background: linear-gradient(160deg, rgba(58, 16, 20, 0.96), rgba(24, 8, 10, 0.98));
   border: 1px solid rgba(255, 199, 44, 0.08);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .gold-text {

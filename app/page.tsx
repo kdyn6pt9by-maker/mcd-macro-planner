@@ -18,6 +18,8 @@ import {
   planSaved,
   pendingOverage,
   pendingWeekendChoice,
+  pendingYesterdayOver,
+  cutFor,
   reserveBalance,
   saveReserve,
 } from "@/lib/reserve";
@@ -26,6 +28,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { DayBar } from "@/components/DayBar";
+import { targetsFor } from "@/lib/targets";
 import { AddFoodSheet } from "@/components/AddFoodSheet";
 import { CalorieRing } from "@/components/CalorieRing";
 import { Celebration } from "@/components/Celebration";
@@ -185,15 +188,32 @@ function HomeScreen() {
   // Today's target moves by: the Fri–Sun bank share (unless stored), reserve withdrawals, minus any weekend payback.
   // The extra (or missing) room goes to carbs.
   const adjust = settings && day ? adjustOn(todayKey()) : null;
-  const baseTargets = settings ? effectiveTargets(settings, mode) : undefined;
-  const targets =
-    baseTargets && adjust && adjust.total !== 0
-      ? { ...baseTargets, kcal: baseTargets.kcal + adjust.total, carbsRef: Math.max(0, baseTargets.carbsRef + Math.round(adjust.total / 4)) }
-      : baseTargets;
+  // Same rule as the calorie bar on other pages (bank share, reserve, payback, plan, make-up cut from fat+carbs).
+  const targets = settings && day ? targetsFor(todayKey(), settings, mode, allDays, reserve) : undefined;
+  const cutToday = cutFor(todayKey(), reserve);
   // Bank questions wait until the weekend check-in and any celebration are out of the way.
-  const promptsFree = weekendDates.length === 0 && celebrate === null;
+  // "Later" hides the bank questions until the app is opened again, so a question can never trap you.
+  const [promptsSnoozed, setPromptsSnoozed] = useState(false);
+  const promptsFree = weekendDates.length === 0 && celebrate === null && !promptsSnoozed;
   const weekendChoice = settings && day && promptsFree ? pendingWeekendChoice(todayKey(), allDays, settings, reserve) : null;
   const overage = settings && day && promptsFree && !weekendChoice ? pendingOverage(todayKey(), allDays, settings, reserve) : null;
+  const yesterdayOver =
+    settings && day && promptsFree && !weekendChoice && !overage ? pendingYesterdayOver(todayKey(), allDays, settings, reserve) : null;
+
+  function decideYesterday(decision: "today" | "split" | "no") {
+    if (!yesterdayOver) return;
+    const { date, over } = yesterdayOver;
+    const cut =
+      decision === "today" ? { over, from: todayKey(), days: 1, perDay: over } : decision === "split" ? { over, from: todayKey(), days: 2, perDay: Math.round(over / 2) } : { over, from: todayKey(), days: 1, perDay: 0 };
+    updateReserve({ ...reserve, dayCuts: { ...reserve.dayCuts, [date]: cut } });
+    showToast(
+      decision === "no"
+        ? t("👍 Carrying on normally", "👍 نكمل طبيعي")
+        : decision === "today"
+          ? t(`✂️ −${over} today, from carbs and fat`, `✂️ −${over} اليوم، من الكارب والدهون`)
+          : t(`✂️ −${cut.perDay} today and tomorrow, from carbs and fat`, `✂️ −${cut.perDay} اليوم وبكرة، من الكارب والدهون`)
+    );
+  }
 
   function chooseWeekend(date: string, choice: WeekendChoice) {
     updateReserve({ ...reserve, choices: { ...reserve.choices, [date]: choice } });
@@ -538,6 +558,12 @@ function HomeScreen() {
             </motion.div>
           ))}
         </motion.div>
+
+        {cutToday > 0 && (
+          <div className="mt-3 rounded-xl bg-red/10 ring-1 ring-red/25 px-3 py-2 text-[11px]">
+            ✂️ {t(`Making up for going over: −${cutToday} kcal today (from carbs and fat).`, `تعويض الزيادة: −${cutToday} سعرة اليوم (من الكارب والدهون).`)}
+          </div>
+        )}
 
         {/* Evening nudge: weekday after 7pm with protein still short */}
         {(() => {
@@ -1133,7 +1159,16 @@ function HomeScreen() {
       <Toast toast={toast} onDismiss={() => setToast(null)} />
       <UpdateBanner />
       <WeekendCheckIn dates={weekendDates} onSave={saveWeekend} />
-      <BankPrompt choice={weekendChoice} overage={overage} balance={reserveInfo.balance} onChoose={chooseWeekend} onOverage={decideOverage} />
+      <BankPrompt
+        choice={weekendChoice}
+        overage={overage}
+        yesterday={yesterdayOver}
+        balance={reserveInfo.balance}
+        onChoose={chooseWeekend}
+        onOverage={decideOverage}
+        onYesterday={decideYesterday}
+        onLater={() => setPromptsSnoozed(true)}
+      />
       <Celebration streak={celebrate} onDone={() => setCelebrate(null)} />
     </MotionConfig>
   );

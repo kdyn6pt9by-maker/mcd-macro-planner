@@ -35,6 +35,15 @@ export interface ReserveState {
   paybacks: Record<string, Payback>;
   /** Saving plans: eat `kcal` under target for `days` days from `start`; what you actually save goes to the reserve. */
   savePlans?: SavePlan[];
+  /** Answers to "you went over yesterday", keyed by the day you went over. perDay 0 = declined. */
+  dayCuts?: Record<string, DayCut>;
+}
+
+export interface DayCut {
+  over: number;
+  from: string;
+  days: number;
+  perDay: number;
 }
 
 export interface SavePlan {
@@ -44,7 +53,7 @@ export interface SavePlan {
   kcal: number;
 }
 
-export const EMPTY_RESERVE: ReserveState = { choices: {}, moves: [], paybacks: {}, savePlans: [] };
+export const EMPTY_RESERVE: ReserveState = { choices: {}, moves: [], paybacks: {}, savePlans: [], dayCuts: {} };
 const RESERVE_KEY = "mcd-planner:reserve";
 /** Weekend overage under this is noise, not worth asking about. */
 export const OVER_TOLERANCE = 100;
@@ -54,7 +63,7 @@ export function loadReserve(): ReserveState {
   try {
     const raw = window.localStorage.getItem(RESERVE_KEY);
     const v = raw ? JSON.parse(raw) : null;
-    return { choices: v?.choices ?? {}, moves: v?.moves ?? [], paybacks: v?.paybacks ?? {}, savePlans: v?.savePlans ?? [] };
+    return { choices: v?.choices ?? {}, moves: v?.moves ?? [], paybacks: v?.paybacks ?? {}, savePlans: v?.savePlans ?? [], dayCuts: v?.dayCuts ?? {} };
   } catch {
     return EMPTY_RESERVE;
   }
@@ -239,4 +248,28 @@ export function pendingWeekendChoice(today: string, days: Record<string, DayStat
   if (!isSpendDate(today) || reserve.choices[today]) return null;
   const share = shareFor(today, days, settings, reserve);
   return share > 0 ? { date: today, share } : null;
+}
+
+/** kcal taken off a date's target to make up for going over on an earlier day (from fat and carbs, never protein). */
+export function cutFor(date: string, reserve: ReserveState): number {
+  return Object.values(reserve.dayCuts ?? {})
+    .filter((c) => c.perDay > 0 && date >= c.from && date <= addDays(c.from, c.days - 1))
+    .reduce((n, c) => n + c.perDay, 0);
+}
+
+/**
+ * "You went over yesterday — make it up today?" Asked Tue–Fri about a logged Mon–Thu
+ * (weekends have their own weekend-overage question), once, when it's more than OVER_TOLERANCE.
+ */
+export function pendingYesterdayOver(today: string, days: Record<string, DayState>, settings: Settings, reserve: ReserveState) {
+  const yesterday = addDays(today, -1);
+  const dow = dowOf(yesterday);
+  if (dow < 1 || dow > 4 || reserve.dayCuts?.[yesterday]) return null;
+  const day = days[yesterday];
+  if (!day?.entries.length) return null;
+  const a = dayAdjust(yesterday, days, settings, reserve);
+  // Judged against that day's real target (with any make-up cut), but not against a voluntary saving plan.
+  const allowed = effectiveTargets(settings, "workday").kcal + a.total + a.plan - cutFor(yesterday, reserve);
+  const over = Math.round(sumMacros(day.entries.map((e) => e.macros)).kcal - allowed);
+  return over > OVER_TOLERANCE ? { date: yesterday, over } : null;
 }

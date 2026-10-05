@@ -1,5 +1,5 @@
 import { effectiveTargets } from "./goals";
-import { ReserveState, dayAdjust } from "./reserve";
+import { ReserveState, cutFor, dayAdjust } from "./reserve";
 import { DayMode, DayState, Settings, Targets } from "./types";
 
 /**
@@ -9,7 +9,23 @@ import { DayMode, DayState, Settings, Targets } from "./types";
 export function targetsFor(date: string, settings: Settings, mode: DayMode, days: Record<string, DayState>, reserve: ReserveState): Targets {
   const base = effectiveTargets(settings, mode);
   const adj = dayAdjust(date, days, settings, reserve).total;
-  return adj ? { ...base, kcal: base.kcal + adj, carbsRef: Math.max(0, base.carbsRef + Math.round(adj / 4)) } : base;
+  const withAdj = adj ? { ...base, kcal: base.kcal + adj, carbsRef: Math.max(0, base.carbsRef + Math.round(adj / 4)) } : base;
+  return applyCut(withAdj, cutFor(date, reserve));
+}
+
+/**
+ * Takes `cut` kcal off from fat and carbs together (protein untouched): fat shrinks in proportion to calories,
+ * never below 20% of calories, and carbs absorb the rest.
+ */
+export function applyCut(t: Targets, cut: number): Targets {
+  if (cut <= 0) return t;
+  const kcal = t.kcal - cut;
+  const ratio = kcal / t.kcal;
+  const floor = (kcal * 0.2) / 9;
+  const fatMax = Math.round(Math.max(t.fatMax * ratio, Math.min(t.fatMax, floor)));
+  const fatMin = Math.min(fatMax, Math.round(Math.max(t.fatMin * ratio, Math.min(t.fatMin, floor))));
+  const carbsRef = Math.max(0, Math.round(t.carbsRef - (cut - (t.fatMax - fatMax) * 9) / 4));
+  return { ...t, kcal, fatMax, fatMin, carbsRef };
 }
 
 export { DATA_EVENT, notifyDataChanged } from "./events";

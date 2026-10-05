@@ -114,7 +114,7 @@ export function AddFoodSheet({ open, initialDate, savedMeals, onClose, onAdd, on
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
+            className="fixed inset-0 z-40 bg-black/70"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

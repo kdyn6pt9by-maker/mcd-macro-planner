@@ -83,7 +83,7 @@ export function PaySheet({ request, recentAmounts, onSave, onSkip }: Props) {
     <AnimatePresence>
       {request && (
         <>
-          <motion.div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onSkip} />
+          <motion.div className="fixed inset-0 z-40 bg-black/70" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onSkip} />
           <motion.div
             className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-[2rem] glass px-5 pt-5 max-h-[92dvh] overflow-y-auto overscroll-contain"
             style={sheetStyle}
