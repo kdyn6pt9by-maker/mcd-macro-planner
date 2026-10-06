@@ -3,6 +3,7 @@
 import { foodEmoji } from "@/lib/foodEmoji";
 
 import { useI18n } from "@/lib/i18n";
+import { fmtAed } from "@/lib/prices";
 
 import { motion } from "framer-motion";
 import { Combination } from "@/lib/types";
@@ -38,9 +39,12 @@ interface Props {
   history?: HistoryEntry;
   proteinTarget: number;
   onSelect: () => void;
+  /** Learned price (exact = paid for this exact order before). */
+  price?: { amount: number; exact: boolean } | null;
+  cheapest?: boolean;
 }
 
-export function RecommendationCard({ combo, index, history, proteinTarget, onSelect }: Props) {
+export function RecommendationCard({ combo, index, history, proteinTarget, onSelect, price, cheapest }: Props) {
   const { t, ar } = useI18n();
   const best = combo.labels.includes("BEST MATCH");
   const proteinHit = combo.afterEating.protein >= proteinTarget;
@@ -73,7 +77,17 @@ export function RecommendationCard({ combo, index, history, proteinTarget, onSel
               {t(`↺ Chosen ${history.count}×`, `↺ اخترته ${history.count}×`)} · {relativeDay(history.lastUsed, ar)}
             </motion.span>
           )}
-          <span className="ms-auto text-[11px] text-muted">#{index + 1}</span>
+          {cheapest && (
+            <span className="text-[10px] font-black tracking-wider px-2 py-1 rounded-full bg-emerald-400 text-black">{t("💰 CHEAPEST", "💰 الأرخص")}</span>
+          )}
+          {price ? (
+            <span className="ms-auto text-xs font-black text-emerald-300" title={price.exact ? "paid before" : "estimate"}>
+              {price.exact ? "" : "≈ "}
+              {fmtAed(price.amount)} {t("AED", "درهم")}
+            </span>
+          ) : (
+            <span className="ms-auto text-[11px] text-muted">#{index + 1}</span>
+          )}
         </div>
 
         <div className="space-y-1.5 mb-4">

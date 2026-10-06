@@ -9,6 +9,7 @@ import { FoodItem, Macros, Targets } from "@/lib/types";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { DayPicker } from "./DayPicker";
 import { useI18n } from "@/lib/i18n";
+import { PriceBook, fmtAed, orderPrice } from "@/lib/prices";
 import { todayKey } from "@/lib/storage";
 
 type Sort = "protein" | "kcal" | "fat";
@@ -25,9 +26,12 @@ interface Props {
   eatenOn: (date: string) => Macros;
   targets: Targets;
   onAdd: (lines: { food: FoodItem; qty: number }[], date: string) => void;
+  /** Learned prices, to show what each item and the whole pick cost. */
+  prices?: PriceBook;
+  nadaPrice?: number;
 }
 
-export function McMenuSheet({ open, initialDate, initialQty, onClose, foods, eatenOn, targets, onAdd }: Props) {
+export function McMenuSheet({ open, initialDate, initialQty, onClose, foods, eatenOn, targets, onAdd, prices, nadaPrice = 6 }: Props) {
   const editing = !!initialQty;
   const { t } = useI18n();
   const SORTS: { id: Sort; label: string }[] = [
@@ -66,6 +70,7 @@ export function McMenuSheet({ open, initialDate, initialQty, onClose, foods, eat
   const lines = foods.filter((f) => (qty[f.id] ?? 0) > 0).map((f) => ({ food: f, qty: qty[f.id] }));
   const itemCount = lines.reduce((n, l) => n + l.qty, 0);
   const adds = roundMacros(lines.reduce((s, l) => addMacros(s, scaleMacros(l.food.macros, l.qty)), ZERO_MACROS));
+  const pickPrice = prices && lines.length ? orderPrice(lines.map((l) => ({ id: l.food.id, qty: l.qty })), 0, nadaPrice, prices) : null;
   const after = roundMacros(addMacros(eaten, adds));
   const fatOver = after.fat > targets.fatMax;
   const kcalOver = after.kcal > targets.kcal;
@@ -116,7 +121,16 @@ export function McMenuSheet({ open, initialDate, initialQty, onClose, foods, eat
                   <div className="text-lg font-black text-gold">
                     <AnimatedNumber value={adds.kcal} />
                   </div>
-                  <div className="text-[10px] text-muted">{t(`${itemCount} item${itemCount === 1 ? "" : "s"}`, `${itemCount} صنف`)}</div>
+                  <div className="text-[10px] text-muted">
+                    {pickPrice ? (
+                      <span className="text-emerald-300 font-bold">
+                        {pickPrice.exact ? "" : "≈ "}
+                        {fmtAed(pickPrice.amount)} {t("AED", "درهم")}
+                      </span>
+                    ) : (
+                      t(`${itemCount} item${itemCount === 1 ? "" : "s"}`, `${itemCount} صنف`)
+                    )}
+                  </div>
                 </div>
                 <div className="rounded-2xl py-2 bg-white/[0.04] ring-1 ring-white/5">
                   <div className="text-[10px] text-muted">{isToday ? t("Day total", "مجموع اليوم") : t("That day", "مجموع ذاك اليوم")}</div>
@@ -189,6 +203,12 @@ export function McMenuSheet({ open, initialDate, initialQty, onClose, foods, eat
                         <span className="text-gold">{f.macros.kcal}</span> kcal ·{" "}
                         <span className="text-success">P {f.macros.protein}</span> · <span className="text-warn">F {f.macros.fat}</span> ·{" "}
                         <span className="text-carb">C {f.macros.carbs}</span>
+                        {prices?.item[f.id] !== undefined && (
+                          <span className="text-emerald-300 font-bold">
+                            {" "}
+                            · ≈ {fmtAed(prices.item[f.id])} {t("AED", "درهم")}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">

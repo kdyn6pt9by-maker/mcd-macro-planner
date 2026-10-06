@@ -29,6 +29,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useSearchParams } from "next/navigation";
 import { DayBar } from "@/components/DayBar";
 import { targetsFor } from "@/lib/targets";
+import { EMPTY_PRICES, buildPriceBook, fmtAed, orderPrice } from "@/lib/prices";
 import { AddFoodSheet } from "@/components/AddFoodSheet";
 import { CalorieRing } from "@/components/CalorieRing";
 import { Celebration } from "@/components/Celebration";
@@ -243,7 +244,6 @@ function HomeScreen() {
   }
   const eaten = useMemo(() => sumMacros(day?.entries.map((e) => e.macros) ?? []), [day]);
   const nadaCount = day?.entries.filter((e) => e.kind === "nada").length ?? 0;
-  const usualAdded = day?.entries.some((e) => e.kind === "usual") ?? false;
   const eatenOn = useCallback(
     (date: string) => (date === day?.date ? eaten : sumMacros(loadDay(date).entries.map((e) => e.macros))),
     [day, eaten]
@@ -279,7 +279,36 @@ function HomeScreen() {
     });
   }, [settings, targets, eaten, nadaFood, nadaCount, filter]);
   // The McD list is shown within-calories first, most calories first.
-  const recommendations = useMemo(() => [...ranked].sort(byFitThenKcal), [ranked]);
+  // Prices learned from what you've paid (exact for orders you've paid before, estimated otherwise).
+  const prices = useMemo(() => (settings ? buildPriceBook(Object.values(allDays), settings.foods) : EMPTY_PRICES), [allDays, settings]);
+  const priceOf = useCallback(
+    (combo: Combination) =>
+      settings
+        ? orderPrice(
+            combo.items.filter((i) => i.food.category !== "nada").map((i) => ({ id: i.food.id, qty: i.qty })),
+            combo.items.filter((i) => i.food.category === "nada").reduce((n, i) => n + i.qty, 0),
+            settings.nada.price,
+            prices
+          )
+        : null,
+    [settings, prices]
+  );
+  const [sortBy, setSortBy] = useState<"kcal" | "price">("kcal");
+  const recommendations = useMemo(() => {
+    const list = [...ranked].sort(byFitThenKcal);
+    if (sortBy === "kcal") return list;
+    // Cheapest first; orders without a known price go last (still most-calories-first among themselves).
+    const p = new Map(list.map((c) => [c, priceOf(c)?.amount ?? Infinity]));
+    return list.sort((a, b) => p.get(a)! - p.get(b)!);
+  }, [ranked, sortBy, priceOf]);
+  const cheapestKey = useMemo(() => {
+    let best: { key: string; amount: number } | null = null;
+    for (const c of recommendations) {
+      const pr = priceOf(c);
+      if (pr && (!best || pr.amount < best.amount)) best = { key: combinationKey(c), amount: pr.amount };
+    }
+    return best?.key ?? null;
+  }, [recommendations, priceOf]);
 
   const dayName = (date: string) =>
     date === todayKey()
@@ -307,11 +336,6 @@ function HomeScreen() {
     saveMode(next);
   }
 
-  function addUsualMeal() {
-    if (!settings || usualAdded) return;
-    const { label, ...m } = settings.usualMeal;
-    addEntries(todayKey(), [{ kind: "usual", label, macros: m }], t(`Usual meal added · +${m.protein}g protein`, `أُضيفت وجبتك المعتادة · +${m.protein} جرام بروتين`));
-  }
 
   function addNada() {
     if (!settings || !nadaFood || nadaCount >= settings.nada.maxPerDay) return;
@@ -742,6 +766,20 @@ function HomeScreen() {
                 <div className="flex items-center justify-between mt-7 mb-3">
                   <h2 className="text-lg font-black">{t("Your best orders", "أفضل طلبات لك")}</h2>
                 </div>
+                <div className="flex gap-1.5 mb-2">
+                  {(["kcal", "price"] as const).map((k) => (
+                    <button
+                      key={k}
+                      onClick={() => {
+                        setSortBy(k);
+                        setShown(PAGE);
+                      }}
+                      className={`flex-1 rounded-xl py-2 text-xs font-bold transition-colors ${sortBy === k ? "bg-emerald-400 text-black" : "glass text-muted"}`}
+                    >
+                      {k === "kcal" ? t("🔥 Most calories", "🔥 أعلى سعرات") : t("💰 Cheapest", "💰 الأرخص")}
+                    </button>
+                  ))}
+                </div>
                 <div className="relative grid grid-cols-4 p-1 rounded-2xl glass mb-4">
                   {(["all", "beef", "chicken", "breakfast"] as Filter[]).map((f) => (
                     <button
@@ -799,6 +837,8 @@ function HomeScreen() {
                             proteinTarget={targets.proteinMin}
                             history={historyFor(combinationKey(combo))}
                             onSelect={() => selectCombination(combo)}
+                            price={priceOf(combo)}
+                            cheapest={combinationKey(combo) === cheapestKey}
                           />
                         ))}
                       </AnimatePresence>
@@ -856,6 +896,15 @@ function HomeScreen() {
                       <span className="block text-sm">{f.label}</span>
                       <span className="block text-[11px] text-muted">
                         {kcal} kcal · ×{f.count}
+                        {(() => {
+                          const pr = orderPrice(
+                            items.filter((it) => it.id !== "nada").map((it) => ({ id: it.id, qty: it.qty })),
+                            items.find((it) => it.id === "nada")?.qty ?? 0,
+                            settings.nada.price,
+                            prices
+                          );
+                          return pr ? <span className="text-emerald-300 font-bold"> · {pr.exact ? "" : "≈ "}{fmtAed(pr.amount)} {t("AED", "درهم")}</span> : null;
+                        })()}
                       </span>
                     </span>
                     <motion.button
@@ -881,7 +930,7 @@ function HomeScreen() {
         <DayBar eaten={eaten} targets={targets} />
         <motion.header initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
           <h1 className="text-2xl font-black tracking-tight">➕ {t("Log food", "سجّل أكلك")}</h1>
-          <p className="text-xs text-muted mt-0.5">{t("Usual meal, Nada, McDonald's, anything else — today or a past day.", "وجبتك المعتادة، ندى، ماك، أو أي شي ثاني — لليوم أو ليوم فات.")}</p>
+          <p className="text-xs text-muted mt-0.5">{t("Nada, your saved meals, McDonald's, anything else — today or a past day.", "ندى، وجباتك المحفوظة، ماك، أو أي شي ثاني — لليوم أو ليوم فات.")}</p>
         </motion.header>
 
         {/* Finish my day: the closest orders for what's left, or pick yourself */}
@@ -902,6 +951,10 @@ function HomeScreen() {
                     <div className="text-sm font-bold truncate">{combinationLabel(combo)}</div>
                     <div className="text-[11px] text-muted">
                       +{combo.totals.kcal} kcal · +{combo.totals.protein}g P ·{" "}
+                      {(() => {
+                        const pr = priceOf(combo);
+                        return pr ? <span className="text-emerald-300 font-bold">{pr.exact ? "" : "≈ "}{fmtAed(pr.amount)} {t("AED", "درهم")} · </span> : null;
+                      })()}
                       {combo.remainingKcal >= 0 ? t(`${combo.remainingKcal} left after`, `يبقى ${combo.remainingKcal}`) : t(`${-combo.remainingKcal} over`, `زايد ${-combo.remainingKcal}`)}
                     </div>
                   </div>
@@ -949,20 +1002,7 @@ function HomeScreen() {
         </AnimatePresence>
 
         {/* Quick actions */}
-        <div className="grid grid-cols-2 gap-2.5 mt-4">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={addUsualMeal}
-            disabled={usualAdded}
-            className="glass rounded-2xl p-4 text-start disabled:opacity-40 transition-opacity"
-          >
-            <div className="text-2xl">🥣</div>
-            <div className="font-bold mt-1.5">{usualAdded ? t("Usual meal ✓", "الوجبة المعتادة ✓") : t("+ Usual Meal", "+ وجبتي المعتادة")}</div>
-            <div className="text-[11px] text-muted">
-              {settings.usualMeal.kcal} kcal · {settings.usualMeal.protein}g P
-            </div>
-          </motion.button>
-
+        <div className="grid grid-cols-1 gap-2.5 mt-4">
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={addNada}
@@ -1116,6 +1156,8 @@ function HomeScreen() {
         foods={settings.foods.filter((f) => f.enabled)}
         eatenOn={eatenOn}
         targets={targets}
+        prices={prices}
+        nadaPrice={settings.nada.price}
         onAdd={(lines, date) =>
           logOrder(
             date,
@@ -1131,6 +1173,8 @@ function HomeScreen() {
         foods={settings.foods.filter((f) => f.enabled)}
         eatenOn={eatenOn}
         targets={targets}
+        prices={prices}
+        nadaPrice={settings.nada.price}
         onAdd={(lines) => {
           if (!editing) return;
           const res = editOrder(editing.date, editing.groupId, lines, settings.foods, uid);

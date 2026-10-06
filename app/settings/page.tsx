@@ -273,7 +273,6 @@ export default function SettingsPage() {
 
   const [toast, setToast] = useState<ToastData | null>(null);
   const [nadaDraft, setNadaDraft] = useState<Settings["nada"] | null>(null);
-  const [usualDraft, setUsualDraft] = useState<Settings["usualMeal"] | null>(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -305,7 +304,6 @@ export default function SettingsPage() {
           window.localStorage.setItem("mcd-planner:history", prevHistory);
         } catch {}
         setNadaDraft(null);
-        setUsualDraft(null);
         setToast(null);
       },
     });
@@ -442,29 +440,6 @@ export default function SettingsPage() {
         })()}
       </section>
 
-      <section className="rounded-xl3 glass p-4 mb-4">
-        <h2 className="font-semibold mb-2">🥣 {t("Usual Meal", "الوجبة المعتادة")}</h2>
-        {(() => {
-          const u = usualDraft ?? settings.usualMeal;
-          const set = (patch: Partial<Settings["usualMeal"]>) => setUsualDraft({ ...u, ...patch });
-          return (
-            <>
-              <NumberField label={t("Calories", "السعرات")} value={u.kcal} onChange={(v) => set({ kcal: v })} />
-              <NumberField label={t("Protein (g)", "بروتين (جرام)")} value={u.protein} onChange={(v) => set({ protein: v })} />
-              <NumberField label={t("Fat (g)", "دهون (جرام)")} value={u.fat} onChange={(v) => set({ fat: v })} />
-              <NumberField label={t("Carbs (g)", "كارب (جرام)")} value={u.carbs} onChange={(v) => set({ carbs: v })} />
-              <SaveBar
-                dirty={!!usualDraft && !sameMacros(usualDraft, settings.usualMeal)}
-                onCancel={() => setUsualDraft(null)}
-                onSave={() => {
-                  saveProduct({ ...settings, usualMeal: u }, { kind: "usual" }, macrosOf(u));
-                  setUsualDraft(null);
-                }}
-              />
-            </>
-          );
-        })()}
-      </section>
 
       <section className="rounded-xl3 glass p-4 mb-4">
         <h2 className="font-semibold mb-2">🍔 {t("Nutrition Database — McDonald's UAE", "قاعدة بيانات ماكدونالدز الإمارات")}</h2>

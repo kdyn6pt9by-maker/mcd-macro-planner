@@ -1,6 +1,7 @@
 "use client";
 
 import { DayBarLive } from "@/components/DayBar";
+import { buildPriceBook, fmtAed, orderPrice } from "@/lib/prices";
 import { ProgressTabs } from "@/components/ProgressTabs";
 import { effectiveTargets } from "@/lib/goals";
 import { foodEmoji } from "@/lib/foodEmoji";
@@ -37,7 +38,7 @@ import { AddFoodSheet } from "@/components/AddFoodSheet";
 import { McMenuSheet } from "@/components/McMenuSheet";
 import { PayRequest, PaySheet } from "@/components/PaySheet";
 import { fromKey, toKey } from "@/lib/progress";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 type Tab = "items" | "orders" | "days";
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -92,6 +93,7 @@ export default function StatsPage() {
   const [sheet, setSheet] = useState<"food" | "menu" | "scan" | null>(null);
   const [pay, setPay] = useState<PayRequest | null>(null);
   const [editing, setEditing] = useState<{ date: string; groupId: string; qty: Record<string, number> } | null>(null);
+  const prices = useMemo(() => (settings ? buildPriceBook(days, settings.foods) : null), [days, settings]);
   const eatenOn = useCallback((date: string) => sumMacros(listDays().find((d) => d.date === date)?.entries.map((e) => e.macros) ?? []), []);
 
   const refresh = () => {
@@ -191,11 +193,6 @@ export default function StatsPage() {
     });
   }
 
-  function addUsual(date: string) {
-    const { label, ...m } = settings!.usualMeal;
-    appendToDay(date, [{ kind: "usual", label, macros: m }], false, uid);
-    afterLog(date, t(`🥣 Usual meal → ${dayName(date)}`, `🥣 الوجبة المعتادة ← ${dayName(date)}`));
-  }
 
   function addNada(date: string) {
     const n = settings!.nada;
@@ -206,22 +203,10 @@ export default function StatsPage() {
   /** Same one-tap buttons as the home screen, for any day. */
   function QuickRow({ date }: { date: string }) {
     const entries = days.find((d) => d.date === date)?.entries ?? [];
-    const usualDone = entries.some((e) => e.kind === "usual");
     const nadaCount = entries.filter((e) => e.kind === "nada").length;
     const max = settings!.nada.maxPerDay;
     return (
-      <div className="grid grid-cols-2 gap-2 mt-2">
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          disabled={usualDone}
-          onClick={() => addUsual(date)}
-          className="rounded-2xl bg-black/30 ring-1 ring-white/10 px-3 py-2.5 text-start disabled:opacity-40"
-        >
-          <div className="text-sm font-bold">🥣 {usualDone ? t("Usual meal ✓", "الوجبة المعتادة ✓") : t("+ Usual meal", "+ وجبتي المعتادة")}</div>
-          <div className="text-[10px] text-muted">
-            {settings!.usualMeal.kcal} kcal · {settings!.usualMeal.protein}g P
-          </div>
-        </motion.button>
+      <div className="grid grid-cols-1 gap-2 mt-2">
         <motion.button
           whileTap={{ scale: 0.95 }}
           disabled={nadaCount >= max}
@@ -411,6 +396,23 @@ export default function StatsPage() {
                     <div className="text-sm font-semibold">{o.label}</div>
                     <div className="text-[11px] text-muted">
                       {Math.round(total.kcal)} kcal · {t("last", "آخر مرة")} {relativeDay(o.lastUsed, ar)}
+                      {(() => {
+                        const pr =
+                          prices &&
+                          orderPrice(
+                            lines.filter((l) => l.id !== "nada").map((l) => ({ id: l.id, qty: l.qty })),
+                            lines.find((l) => l.id === "nada")?.qty ?? 0,
+                            settings.nada.price,
+                            prices
+                          );
+                        return pr ? (
+                          <span className="text-emerald-300 font-bold">
+                            {" "}
+                            · {pr.exact ? "" : "≈ "}
+                            {fmtAed(pr.amount)} {t("AED", "درهم")}
+                          </span>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                   <span className="font-black text-gold">×{o.count}</span>
@@ -614,6 +616,8 @@ export default function StatsPage() {
         foods={settings.foods.filter((f) => f.enabled)}
         eatenOn={eatenOn}
         targets={effectiveTargets(settings, "workday")}
+        prices={prices ?? undefined}
+        nadaPrice={settings.nada.price}
         onAdd={addOrder}
       />
       <McMenuSheet
@@ -624,6 +628,8 @@ export default function StatsPage() {
         foods={settings.foods.filter((f) => f.enabled)}
         eatenOn={eatenOn}
         targets={effectiveTargets(settings, "workday")}
+        prices={prices ?? undefined}
+        nadaPrice={settings.nada.price}
         onAdd={(lines) => {
           if (!editing) return;
           const res = editOrder(editing.date, editing.groupId, lines, settings.foods, uid);
