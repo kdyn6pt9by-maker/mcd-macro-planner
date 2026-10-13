@@ -26,6 +26,9 @@ import {
   type WeightEntry,
 } from "@/lib/progress";
 import { renderWeekReport, shareOrDownload } from "@/lib/reportImage";
+import { renderFoodLog } from "@/lib/foodLogImage";
+import { targetsFor } from "@/lib/targets";
+import { sumMacros } from "@/lib/engine/macros";
 import { deleteWeight, loadAllDays, loadSettings, loadWeights, saveSettings, saveWeight } from "@/lib/storage";
 import { DayState, Settings } from "@/lib/types";
 
@@ -66,6 +69,7 @@ export default function ProgressPage() {
   const [goal, setGoal] = useState<(typeof GOALS)[number]>(-0.5);
   const [flash, setFlash] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [shareDays, setShareDays] = useState(3);
 
   useEffect(() => {
     setDays(loadAllDays());
@@ -138,6 +142,46 @@ export default function ProgressPage() {
     say(t(`Workday target set to ${kcal.toLocaleString("en-US")} kcal ✓`, `هدف يوم الدوام صار ${kcal.toLocaleString("en-US")} سعرة ✓`));
   }
 
+  async function shareFood() {
+    if (!days || !settings) return;
+    setSharing(true);
+    try {
+      const res = loadReserve();
+      const list = Array.from({ length: shareDays }, (_, i) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - (shareDays - 1 - i));
+        const key = toKey(d);
+        const entries = days[key]?.entries ?? [];
+        const grouped = new Map<string, { label: string; qty: number; kcal: number }>();
+        for (const e of entries) {
+          const g = grouped.get(e.label) ?? { label: e.label, qty: 0, kcal: 0 };
+          g.qty++;
+          g.kcal += e.macros.kcal;
+          grouped.set(e.label, g);
+        }
+        const mode = d.getDay() === 0 || d.getDay() === 6 ? "weekend" : "workday";
+        return {
+          title: date(d, { weekday: "long", day: "numeric", month: "short" }),
+          items: Array.from(grouped.values()),
+          totals: sumMacros(entries.map((e) => e.macros)),
+          target: targetsFor(key, settings, mode, days, res).kcal,
+        };
+      });
+      const blob = await renderFoodLog({
+        rtl: ar,
+        title: t("What I ate", "اللي أكلته"),
+        subtitle: t(`Last ${shareDays} days`, `آخر ${shareDays} أيام`),
+        days: list,
+        labels: { p: t("Protein", "بروتين"), f: t("Fat", "دهون"), c: t("Carbs", "كارب"), kcal: "kcal", none: t("Nothing logged", "ما في تسجيل") },
+        footer: t("McD Macro · by Mohammad Almansoori", "McD Macro · صُنع بواسطة Mohammad Almansoori"),
+      });
+      const r = await shareOrDownload(blob, `what-i-ate-${todayKey}.png`);
+      if (r === "downloaded") say(t("Image saved ✓", "انحفظت الصورة ✓"));
+    } finally {
+      setSharing(false);
+    }
+  }
+
   async function shareWeek() {
     setSharing(true);
     try {
@@ -189,6 +233,30 @@ export default function ProgressPage() {
           {sharing ? "…" : t("🖼️ Share week", "🖼️ شارك أسبوعي")}
         </motion.button>
       </header>
+
+      <section className="mb-4 rounded-2xl glass p-4">
+        <div className="text-sm font-black">📸 {t("Share what I ate", "شارك اللي أكلته")}</div>
+        <div className="text-[11px] text-muted mt-0.5">{t("An image of every food, with each day's calories and macros", "صورة فيها كل أكلك، وسعرات وماكروز كل يوم")}</div>
+        <div className="flex gap-1.5 mt-3">
+          {[2, 3, 4, 5, 6, 7].map((n) => (
+            <button
+              key={n}
+              onClick={() => setShareDays(n)}
+              className={`flex-1 rounded-lg py-1.5 text-xs font-black ${shareDays === n ? "bg-gold text-black" : "bg-white/[0.06] text-muted"}`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={shareFood}
+          disabled={sharing}
+          className="mt-3 w-full rounded-xl bg-gold text-black font-black py-2.5 text-sm disabled:opacity-50"
+        >
+          {sharing ? "…" : t(`Share last ${shareDays} days`, `شارك آخر ${shareDays} أيام`)}
+        </motion.button>
+      </section>
 
       <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="mb-4">
         <StreakCard streak={streak} week={strip} />

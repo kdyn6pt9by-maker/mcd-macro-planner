@@ -28,7 +28,7 @@ export function setPayment(
   label: string,
   amount: number,
   makeId: () => string,
-  flags: { esaad?: boolean; points?: boolean } = {}
+  flags: { esaad?: boolean; points?: boolean; pointsUsed?: number } = {}
 ): DayState {
   const current = loadDay(date);
   const payments = (current.payments ?? []).filter((p) => p.orderId !== orderId);

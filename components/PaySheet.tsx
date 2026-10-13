@@ -8,6 +8,7 @@ import { useKeyboardSheetStyle } from "@/lib/useKeyboardInset";
 export interface PayFlags {
   esaad: boolean;
   points: boolean;
+  pointsUsed?: number;
 }
 
 function Check({ checked, onChange, title, hint, color }: { checked: boolean; onChange: (v: boolean) => void; title: string; hint: string; color: string }) {
@@ -63,20 +64,25 @@ export function PaySheet({ request, recentAmounts, onSave, onSkip }: Props) {
   const [value, setValue] = useState("");
   const [esaad, setEsaad] = useState(true);
   const [points, setPoints] = useState(false);
+  const [pts, setPts] = useState("");
 
   useEffect(() => {
     if (request) {
       setValue("");
       setEsaad(true);
       setPoints(false);
+      setPts("");
     }
   }, [request]);
 
   const parsed = parseFloat(value);
   // Paying fully with points can mean 0 AED.
   const amount = Number.isFinite(parsed) ? parsed : points ? 0 : NaN;
-  const valid = Number.isFinite(amount) && amount < 2000 && (amount > 0 || (points && amount === 0));
-  const save = () => valid && onSave(amount, { esaad, points });
+  const pointsUsed = parseInt(pts, 10);
+  // Redeeming points: how many you used is required.
+  const pointsOk = !points || (Number.isFinite(pointsUsed) && pointsUsed > 0);
+  const valid = Number.isFinite(amount) && amount < 2000 && (amount > 0 || (points && amount === 0)) && pointsOk;
+  const save = () => valid && onSave(amount, points ? { esaad, points, pointsUsed } : { esaad, points });
   const per10 = valid && request && request.protein > 0 ? (amount / request.protein) * 10 : null;
 
   return (
@@ -151,6 +157,19 @@ export function PaySheet({ request, recentAmounts, onSave, onSkip }: Props) {
                 title={t("Used reward points", "استخدمت النقاط")}
                 hint={t("Paid with McDonald's points (amount can be 0)", "دفعت بنقاط ماكدونالدز (المبلغ ممكن يكون 0)")}
               />
+              {points && (
+                <label className="mt-2 flex items-center gap-2 rounded-2xl bg-black/30 ring-1 ring-violet-400/40 px-3.5 py-2.5">
+                  <span className="text-sm font-bold flex-1">⭐ {t("Points used", "كم نقطة استخدمت")}</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={pts}
+                    onChange={(e) => setPts(e.target.value)}
+                    placeholder="0"
+                    className="no-spin w-28 bg-black/40 rounded-xl px-3 py-2 text-end text-lg font-black outline-none border border-violet-400/40"
+                  />
+                </label>
+              )}
             </div>
 
             <AnimatePresence>

@@ -509,7 +509,10 @@ export default function StatsPage() {
                         )}
                         {d.payments?.some((p) => p.points) && (
                           <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-violet-400/20 text-violet-300">
-                            ⭐ {t("POINTS", "نقاط")}
+                            ⭐ {(() => {
+                              const n = d.payments!.reduce((a, p) => a + (p.pointsUsed ?? 0), 0);
+                              return n ? `${n.toLocaleString("en-US")} ${t("pts", "نقطة")}` : t("POINTS", "نقاط");
+                            })()}
                           </span>
                         )}
                         {!!d.payments?.length && (

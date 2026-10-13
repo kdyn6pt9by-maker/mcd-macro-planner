@@ -59,6 +59,8 @@ export interface Payment {
   esaad?: boolean;
   /** Paid (fully or partly) with McDonald's reward points. */
   points?: boolean;
+  /** How many reward points were redeemed for this order. */
+  pointsUsed?: number;
 }
 
 export type EntryKind = "usual" | "nada" | "custom" | "mcdonalds";
