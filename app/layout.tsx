@@ -3,6 +3,7 @@ import "./globals.css";
 import { Suspense } from "react";
 import { LanguageProvider } from "@/lib/i18n";
 import { BottomNav } from "@/components/BottomNav";
+import { RegisterSW } from "@/components/RegisterSW";
 
 export const metadata: Metadata = {
   title: "McD Macro",
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="relative z-10" style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}>
           <LanguageProvider>
             {children}
+            <RegisterSW />
             <Suspense>
               <BottomNav />
             </Suspense>

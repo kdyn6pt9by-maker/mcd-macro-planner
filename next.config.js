@@ -16,7 +16,11 @@ const nextConfig = {
   env: { NEXT_PUBLIC_BUILD_ID: buildId },
   async headers() {
     // Never let the phone cache the version probe, or updates would go unnoticed.
-    return [{ source: "/version.json", headers: [{ key: "Cache-Control", value: "no-store, max-age=0" }] }];
+    return [
+      { source: "/version.json", headers: [{ key: "Cache-Control", value: "no-store, max-age=0" }] },
+      // The offline worker must update as soon as a new version ships.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }] },
+    ];
   },
 };
 
