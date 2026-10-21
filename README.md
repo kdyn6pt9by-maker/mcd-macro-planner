@@ -59,3 +59,9 @@ git push
 ```
 
 Vercel picks up the push and redeploys within ~1 minute.
+
+## Backup copy
+
+If Vercel is unreachable, the same app is published on GitHub Pages:
+https://kdyn6pt9by-maker.github.io/mcd-macro-planner/
+(Data lives on the phone per address — move it with Settings → Backup → Export / Import.)
