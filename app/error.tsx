@@ -14,7 +14,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
       </pre>
       <div className="grid grid-cols-2 gap-2">
         <button onClick={reset} className="rounded-xl bg-white/10 py-3 font-bold">Try again · حاول</button>
-        <button onClick={() => window.location.replace("/")} className="rounded-xl bg-gold text-black py-3 font-black">Reload · أعد التحميل</button>
+        <button onClick={() => window.location.replace(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/`)} className="rounded-xl bg-gold text-black py-3 font-black">Reload · أعد التحميل</button>
       </div>
     </main>
   );

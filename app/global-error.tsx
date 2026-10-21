@@ -8,7 +8,7 @@ export default function GlobalError({ error }: { error: Error }) {
         <h1>⚠️ Something went wrong · صار خطأ</h1>
         <p>Your data is safe. Screenshot this and send it.</p>
         <pre style={{ whiteSpace: "pre-wrap", fontSize: 11, color: "#ff8a7d" }}>{error.message + "\n" + (error.stack ?? "").split("\n").slice(0, 6).join("\n")}</pre>
-        <button onClick={() => window.location.replace("/")} style={{ padding: 12, borderRadius: 12, background: "#ffc72c", border: 0, fontWeight: 900 }}>
+        <button onClick={() => window.location.replace(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/`)} style={{ padding: 12, borderRadius: 12, background: "#ffc72c", border: 0, fontWeight: 900 }}>
           Reload
         </button>
       </body>

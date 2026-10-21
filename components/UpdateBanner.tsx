@@ -9,7 +9,7 @@ const CURRENT = process.env.NEXT_PUBLIC_BUILD_ID;
 
 export async function isUpdateAvailable(): Promise<boolean> {
   try {
-    const res = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" });
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/version.json?t=${Date.now()}`, { cache: "no-store" });
     const { id } = (await res.json()) as { id?: string };
     return !!id && id !== CURRENT;
   } catch {

@@ -8,7 +8,7 @@ import { RegisterSW } from "@/components/RegisterSW";
 export const metadata: Metadata = {
   title: "McD Macro",
   description: "Personal nutrition planning tool. Not affiliated with McDonald's.",
-  manifest: "/manifest.json",
+  manifest: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/manifest.json`,
   authors: [{ name: "Mohammad Almansoori" }],
   creator: "Mohammad Almansoori",
   appleWebApp: {
@@ -17,8 +17,8 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
   },
   icons: {
-    icon: "/icon-192.png",
-    apple: "/icon-192.png",
+    icon: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/icon-192.png`,
+    apple: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/icon-192.png`,
   },
 };
 

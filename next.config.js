@@ -11,10 +11,16 @@ function commitId() {
 }
 const buildId = process.env.VERCEL_GIT_COMMIT_SHA || commitId();
 
+// GitHub Pages copy: a static export served under /<repo>. Vercel builds are unchanged.
+const pages = process.env.STATIC_EXPORT === "1";
+const basePath = pages ? process.env.PAGES_BASE_PATH || "/mcd-macro-planner" : "";
+
 const nextConfig = {
   reactStrictMode: true,
-  env: { NEXT_PUBLIC_BUILD_ID: buildId },
+  env: { NEXT_PUBLIC_BUILD_ID: buildId, NEXT_PUBLIC_BASE_PATH: basePath },
+  ...(pages ? { output: "export", basePath, trailingSlash: true, images: { unoptimized: true } } : {}),
   async headers() {
+    if (pages) return [];
     // Never let the phone cache the version probe, or updates would go unnoticed.
     return [
       { source: "/version.json", headers: [{ key: "Cache-Control", value: "no-store, max-age=0" }] },
